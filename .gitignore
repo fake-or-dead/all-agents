@@ -14,6 +14,8 @@
 /.phpunit.cache/
 /.phpunit.result.cache
 /coverage/
+/playwright-report/
+/test-results/
 /.cache/
 /.DS_Store
 /.scratch/

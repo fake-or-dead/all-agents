@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+version="${1:?Usage: bin/build-artifact VERSION COMMIT}"
+commit="${2:?Usage: bin/build-artifact VERSION COMMIT}"
+image="tapoda-next:${version}"
+
+docker build \
+    --target runtime \
+    --build-arg "APP_BUILD_VERSION=${version}" \
+    --build-arg "APP_BUILD_COMMIT=${commit}" \
+    --label "org.opencontainers.image.revision=${commit}" \
+    --tag "${image}" \
+    .
+
+docker image inspect \
+    --format 'image={{index .RepoTags 0}} digest={{.Id}} version={{index .Config.Labels "org.opencontainers.image.version"}} commit={{index .Config.Labels "org.opencontainers.image.revision"}}' \
+    "${image}"
+
+image_id="$(docker image inspect --format '{{.Id}}' "${image}")"
+echo "export TAPODA_APP_IMAGE=${image_id}"

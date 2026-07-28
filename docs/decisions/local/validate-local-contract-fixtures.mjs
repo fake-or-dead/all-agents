@@ -132,7 +132,12 @@ for (const fixtureId of ['zero_rows', 'boundary_states_groups']) {
     const screen = rows.map(row => project(row, spec.applicant.fields, 'screen', allApplicantCaps).result);
     const print = rows.map(row => project(row, spec.applicant.fields, 'print', allApplicantCaps).result);
     const xlsx = rows.map(row => project(row, spec.applicant.fields, 'xlsx', allApplicantCaps).result);
-    const expectedPrint = screen.map(({ mental_health, substance_use, ...allowed }) => allowed);
+    const expectedPrint = screen.map(row => {
+      const allowed = { ...row };
+      delete allowed.mental_health;
+      delete allowed.substance_use;
+      return allowed;
+    });
     equal(print, expectedPrint, `${fixtureId}: applicant print omits mental-health/substance-use`);
     equal(screen, xlsx, `${fixtureId}: applicant screen/XLSX field-value parity`);
   }

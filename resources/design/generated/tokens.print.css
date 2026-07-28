@@ -1,0 +1,50 @@
+/* Generated. Do not edit. */
+@media print {
+    :root {
+    --action-destructive: #a32929;
+    --action-primary: #176b49;
+    --action-secondary: #594235;
+    --border-default: #d8ccc3;
+    --border-strong: #765b49;
+    --color-amber-800: #8a5700;
+    --color-blue-700: #285c8c;
+    --color-green-700: #176b49;
+    --color-ink: #251f1b;
+    --color-red-700: #a32929;
+    --color-stone-100: #eee8e3;
+    --color-stone-50: #f7f4f1;
+    --color-stone-500: #765b49;
+    --color-stone-700: #594235;
+    --color-white: #ffffff;
+    --focus-ring: #285c8c;
+    --font-body: "Sarabun", system-ui, sans-serif;
+    --font-line-body: 1.65;
+    --font-size-body: 1rem;
+    --font-size-small: 0.875rem;
+    --font-size-title: clamp(1.75rem, 5vw, 3rem);
+    --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+    --motion-fast: 120ms;
+    --motion-normal: 200ms;
+    --radius-medium: 0.75rem;
+    --radius-small: 0.375rem;
+    --size-content: 72rem;
+    --size-touch: 2.75rem;
+    --space-1: 0.25rem;
+    --space-12: 3rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --status-blocked: #a32929;
+    --status-ready: #176b49;
+    --status-waiting: #8a5700;
+    --surface-default: #ffffff;
+    --surface-elevated: #ffffff;
+    --surface-page: #f7f4f1;
+    --text-default: #251f1b;
+    --text-inverse: #ffffff;
+    --text-link: #285c8c;
+    --text-muted: #594235;
+    }
+}
