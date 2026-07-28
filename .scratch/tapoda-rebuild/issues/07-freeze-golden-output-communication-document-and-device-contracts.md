@@ -10,8 +10,8 @@ Produce approved fixtures and matrices for every report, export, print, email, d
 
 - [x] Locally satisfied: applicant, teacher, laundry, print, and eight-sheet export fixtures define fields, grouping, membership, ordering, labels, dates, and authorized audiences.
 - [x] Locally satisfied: screen, counter, print, and export differences are reconciled by one local `ReportSpecification`.
-- [x] Locally satisfied: every notification variant defines recipient, audience, course, template, link, attachment, sender, retry, bounce, and failure behavior through a deterministic fake gateway.
-- [x] Locally satisfied: `CLARIFY-005` defaults to disabled unresolved operational template; schedule/manual reminders use one idempotent policy.
+- [x] Locally satisfied: every active notification variant, including three legacy and four current confirmation variants, defines recipient, audience, course, template, link, attachment, sender, retry, bounce, and failure behavior through a deterministic fake gateway.
+- [x] Locally satisfied: `CLARIFY-005` Email 2 is disabled as `template_unresolved`, has no routing/template/assets, and is excluded from active inventory; schedule/manual reminders use one idempotent policy.
 - [x] Locally satisfied: document metadata and safe local compatibility-URL disposition are defined.
 - [x] Locally satisfied: Thai ID fake/secure interface, minimum fields, trust model, mismatch default, health/version behavior, and manual fallback are defined.
 - [x] Locally satisfied: local brand/accessibility, email, and print defaults are defined.
@@ -21,7 +21,7 @@ Produce approved fixtures and matrices for every report, export, print, email, d
 
 ## Local completion record
 
-2026-07-29 — [Local output, communication, document, and device contracts](../../../docs/decisions/local/output-device-contracts.md), [synthetic fixture](../../../docs/decisions/local/output-device-fixtures.json), and [deterministic validator](../../../docs/decisions/local/validate-local-contract-fixtures.mjs) define executable local defaults and exclude owner signoff.
+2026-07-29 — [Local output, communication, document, and device contracts](../../../docs/decisions/local/output-device-contracts.md), [synthetic fixture](../../../docs/decisions/local/output-device-fixtures.json), and [deterministic validator](../../../docs/decisions/local/validate-local-contract-fixtures.mjs) define executable local defaults. The validator computes membership, values, parity, Thai ordering, Buddhist dates, totals, pagination, redaction, and authorization. Production owner signoff remains excluded.
 
 ## Blocked by
 

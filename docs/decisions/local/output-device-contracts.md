@@ -4,7 +4,7 @@ Status: locally executable default. This is not Operations, Brand, Accessibility
 
 ## Reports, exports, and print
 
-One versioned `ReportSpecification` owns screen, counter, print, and export membership. The executable synthetic specification is [output-device-fixtures.json](./output-device-fixtures.json), validated by [validate-local-contract-fixtures.mjs](./validate-local-contract-fixtures.mjs). Every fixture is synthetic and carries `spec_version`, `course_session_id`, field set, sort order, requester, authorization result, and generated timestamp.
+One versioned `ReportSpecification` owns screen, counter, print, and export membership. The executable synthetic specification is [output-device-fixtures.json](./output-device-fixtures.json), validated by [validate-local-contract-fixtures.mjs](./validate-local-contract-fixtures.mjs). Every fixture carries `spec_version`, `course_session_id`, `requester`, `authorization_result`, and `generated_at`. Inputs contain synthetic application, teacher-print, and laundry records. Expected results cover zero rows, every state/group boundary, Thai ordering/ties, teacher selections 0/1/10/11, pagination, laundry totals, and unauthorized/redacted/expired downloads.
 
 | Output | Membership / ordering | Local audience and fields |
 |---|---|---|
@@ -12,7 +12,7 @@ One versioned `ReportSpecification` owns screen, counter, print, and export memb
 | Teacher report + print | Five approved teacher groups; invited, confirmed, checked-in, and completed participants only. Thai name then application ID. Maximum 10 selected sheets per print job. | Assigned teacher with `print.create`; emergency/health/medication only if separately granted; no national ID, mental-health, or substance-use fields. |
 | Laundry / facilities | Confirmed, checked-in, and completed participants only; selected category then room, Thai name, application ID. Days `01`–`08`, costs, totals, and persisted needs. | Operations or reporting user with scope and field grants. Screen, print, XLSX use identical rows and totals. |
 
-The legacy report/export disagreement is intentionally resolved by the above rules; it is not copied. Golden fixture cases cover: zero rows; one row in each group; all boundary states; sensitive-field redaction; stable Thai ordering; teacher selections 0/1/10/11; wide-print pagination; laundry totals; unauthorized/expired download. Output request, artifact generation, print rendering, download, expiration, and failure are audited. XLSX neutralizes formula-like values. Print/download only receives a short-lived authorized artifact URL.
+The legacy report/export disagreement is intentionally resolved by the above rules; it is not copied. Thai ordering executes NFC normalization, outer-space trimming, internal-space collapse, `Intl.Collator('th')` primary comparison, then immutable application ID. Dates accept `YYYY-MM-DD` and render `dd/MM/BBBB` with `+543`. The validator computes membership, counters, projections, value parity, sorting, redaction, dates, totals, pagination, and authorization from the inputs before comparing expected screen/print/XLSX results. Output request, artifact generation, print rendering, download, expiration, and failure are audited. XLSX neutralizes formula-like values. Print/download only receives a short-lived authorized artifact URL.
 
 ## Notifications and reminders
 
@@ -23,12 +23,12 @@ All variants create a versioned immutable notification intent through a transact
 | Welcome | New account owner; no course required | Account-safe welcome, support route; no password |
 | Password recovery | Account owner; no course | One-use expiring recovery link |
 | Invitation / staff invitation | Selected applicant / staff applicant; exact session | Versioned invitation, exact course/session, expiry, confirmation/cancellation links |
-| Legacy/current confirmation: D03, D10, monastic D10, staff | Confirmed participant; exact session and persona | Versioned persona template, course details, approved attachment map |
+| Legacy confirmation D03 / D10 / staff | Confirmed participant or staff; exact session and legacy persona | Three separate versioned templates, course details, approved attachment map |
+| Current confirmation D03 / D10 / monastic D10 / staff | Confirmed participant, monastic, or staff; exact session and current persona | Four separate versioned templates, course details, approved attachment map |
 | Request confirmation / scheduled reminder | Invited participant; exact session | Confirmation and cancellation links, deadline, cooldown; due only by policy |
 | Cancellation | Applicant; exact session | Cancellation receipt, next action/support route |
-| Operational | Authorized operational recipient; exact session | Explicit audience, purpose, no sensitive values unless separately approved |
 
-`CLARIFY-005` local default: “Email 2” is **not a distinct active template**. Treat it as `operational` with no recipients, course mapping, copy, assets, or sender until an Operations owner supplies a versioned template contract. Any legacy trigger is disabled locally and emits an audited `template_unresolved` result; it cannot silently send or change lifecycle state.
+`CLARIFY-005` local default: “Email 2” is disabled and excluded from the active notification inventory. Its machine-readable disposition is `template_unresolved` with no recipient, sender, course mapping, template, links, or assets. Any legacy trigger emits an audited `template_unresolved` result; it cannot send or change lifecycle state.
 
 Reminder default: manual preview is read-only and lists every due recipient in one selected session. Manual send and scheduled worker use the same policy: eligible `invited` recipients whose reminder due time has passed, one active invitation, no completed confirmation/cancellation, and no successful send within 24 hours. Each recipient gets an idempotency key; partial results are recorded individually; retries use bounded deterministic attempts (1, 5, 15 minutes). No command selects an arbitrary first course or first person.
 
