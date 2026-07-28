@@ -4,7 +4,7 @@ Status: locally executable default. This is not Operations, Brand, Accessibility
 
 ## Reports, exports, and print
 
-One versioned `ReportSpecification` owns screen, counter, print, and export membership. Every fixture is synthetic and carries `spec_version`, `course_session_id`, field set, sort order, requester, authorization result, and generated timestamp.
+One versioned `ReportSpecification` owns screen, counter, print, and export membership. The executable synthetic specification is [output-device-fixtures.json](./output-device-fixtures.json), validated by [validate-local-contract-fixtures.mjs](./validate-local-contract-fixtures.mjs). Every fixture is synthetic and carries `spec_version`, `course_session_id`, field set, sort order, requester, authorization result, and generated timestamp.
 
 | Output | Membership / ordering | Local audience and fields |
 |---|---|---|
@@ -16,7 +16,7 @@ The legacy report/export disagreement is intentionally resolved by the above rul
 
 ## Notifications and reminders
 
-All variants create a versioned immutable notification intent through a transactional outbox, then a deterministic local fake gateway. The fake records `queued`, `sent`, `failed`, `bounced`, and retry attempts; it never sends network email. A failure never advances lifecycle state or marks an application notified.
+All variants create a versioned immutable notification intent through a transactional outbox, then deterministic local sender `tapoda-local-fake@invalid`. The fake records `queued`, `sent`, `failed`, `bounced`, and retry attempts; it never sends network email. A failure never advances lifecycle state or marks an application notified. Attachment disposition is explicit per variant: `none` means no attachment is rendered or sent; `approved-document-key` requires a versioned document key from the fixture.
 
 | Variant | Recipient / course mapping | Required content and behavior |
 |---|---|---|
@@ -41,6 +41,8 @@ Locally inventory these legacy document names as metadata only: `apply-form.pdf`
 ## Thai ID companion
 
 `IdentityReader.read(challenge)` is the browser-facing local interface. The browser calls only a paired `127.0.0.1` companion after explicit operator action. The companion accepts a short-lived one-use signed challenge, validates browser origin/expiry/nonce, and returns a signed minimum-data assertion. Laravel verifies it through `IdentityVerificationWorkflow`; Laravel never calls loopback.
+
+The server-issued challenge and companion assertion bind `iss`, `kid`, `jti`, `nonce`, `actor_account_id`, `session_id`, `action=identity.verify`, `course_session_id`, `aud=tapoda-thai-id-companion`, and exact `origin`. Server validation requires known issuer/key ID, signature, audience, action, origin, actor/session/session scope, expiry, and equality of assertion `jti`/`nonce` to the challenge. It atomically consumes `jti` and nonce before persisting a verification event; replay, unknown `kid`, issuer/audience/action/origin mismatch, actor/session mismatch, expired challenge, bad signature, and already-consumed values are rejected and audited without card data.
 
 Approved assertion fields: card-present result, masked national-ID reference, Thai name, English name, date of birth, and gender. Address and photo are excluded. Raw card payload, `/debug`, unauthenticated `/read-card`, wildcard CORS, and remote listeners are prohibited. Health exposes only safe version, readiness, and supported-OS status; it reveals no card data. Mismatch uses an approved course policy: local default **warn, require operator reason, permit audited manual verification**. Card read is optional; manual verification remains available after unavailable, timeout, mismatch, or verification failure. Pairing, key rotation, and revocation are audited.
 

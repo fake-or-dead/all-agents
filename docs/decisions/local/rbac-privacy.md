@@ -29,9 +29,10 @@ Every staff request must pass all four checks: authenticated `account`, active `
 |---|---|---|
 | Normal identity, application, training, attendance | `person.read`, scoped role | Minimum fields for task; no bulk download without export grant |
 | Emergency contact | `emergency_contact.read` | Teacher print and operations only where needed; export requires `emergency_contact.export` |
-| Health and medication | `health.read` | Teacher may view/print only approved session projection; operations/check-in receive a safe operational flag, never free text |
+| Health | `health.read`, `health.print`, `health.export` | Teacher may read/print only approved session projection; operations/check-in receive a safe operational flag, never free text |
+| Medication | `medication.read`, `medication.print`, `medication.export` | Separate from health. No medication value is returned, printed, or exported without the matching capability; a denied value is omitted and recorded as `field_redacted` |
 | Mental health and substance use | `mental_health.read`, `substance_use.read` | Reviewer only when assigned and explicitly granted; never teacher/check-in/operations defaults; independent export grant required |
-| National ID | `national_id.lookup` or `national_id.read` | Lookup uses keyed HMAC; display is masked except last four digits. Full read is prohibited locally; no print/export grant exists |
+| National ID | `national_id.lookup` or `national_id.masked_read` | Lookup uses keyed HMAC; `national_id.masked_read` returns masked value ending in four digits. `national_id.full_read` is deny-only and is never grantable locally; no print/export grant exists |
 | Report / print / export | `report.read`, `print.create`, `export.request` plus each included field grant | Export uses server-authorized fields, not visible UI columns; all results are audited |
 
 Sensitive data never enters URLs, analytics, cache keys, notifications, browser logs, queue payloads, or test fixtures. National ID is encrypted at rest and exact lookup uses a separately keyed HMAC. Local fixtures use synthetic values only.
@@ -50,8 +51,9 @@ Sensitive data never enters URLs, analytics, cache keys, notifications, browser 
 1. Attempt every staff action with wrong center or session: deny and audit.
 2. Attempt every sensitive field without its field grant: omit/redact and audit denied access.
 3. Attempt support without a case, expired grant, or self-approval: deny.
-4. Attempt self-disable, final-admin disable, privileged self-grant, and raw-ID export: deny.
-5. Assert export artifact includes only authorized fields and expires at 24 hours.
+4. Attempt `medication.read`, `medication.print`, and `medication.export` without each exact capability: omit/redact, deny the requested output field, and audit `field_redacted`.
+5. Attempt self-disable, final-admin disable, privileged self-grant, `national_id.full_read`, and raw-ID export: deny.
+6. Assert export artifact includes only authorized fields and expires at 24 hours.
 
 ## Production owner/signoff exclusions
 

@@ -1,0 +1,75 @@
+{
+  "schema_version": "1.0.0",
+  "synthetic_only": true,
+  "timezone": "Asia/Bangkok",
+  "date_display": {"calendar": "buddhist", "format": "dd/MM/BBBB", "ce_to_be_offset": 543, "example": {"source": "2026-07-29", "display": "29/07/2569"}},
+  "thai_sort": {"algorithm": "fixture-thai-primary", "tie_breakers": ["thai_name", "application_id"], "expected_order": ["app-002", "app-001"]},
+  "report_spec": {
+    "id": "tapoda-output-v1",
+    "course_session_id": "session-synthetic-001",
+    "common_fields": [
+      {"key": "application_id", "label_th": "รหัสใบสมัคร"},
+      {"key": "thai_name", "label_th": "ชื่อ - นามสกุล"},
+      {"key": "application_status", "label_th": "สถานะใบสมัคร"},
+      {"key": "submitted_at", "label_th": "วันที่ส่งใบสมัคร", "date_rule": "dd/MM/BBBB"},
+      {"key": "confirmed_at", "label_th": "วันที่ยืนยัน", "date_rule": "dd/MM/BBBB"},
+      {"key": "room", "label_th": "ห้องพัก"},
+      {"key": "emergency_contact", "label_th": "ผู้ติดต่อฉุกเฉิน", "capability": "emergency_contact.read"},
+      {"key": "health_summary", "label_th": "ข้อมูลสุขภาพ", "capability": "health.read"},
+      {"key": "medication_summary", "label_th": "ยา", "capability": "medication.read"}
+    ],
+    "applicant_groups": [
+      {"id": "alumni_male", "label_th": "ศิษย์เก่าชาย", "persona": "alumni", "gender": "male", "expected_ids": ["app-001"]},
+      {"id": "new_male", "label_th": "ศิษย์ใหม่ชาย", "persona": "new", "gender": "male", "expected_ids": ["app-002"]},
+      {"id": "alumni_female", "label_th": "ศิษย์เก่าหญิง", "persona": "alumni", "gender": "female", "expected_ids": ["app-003"]},
+      {"id": "new_female", "label_th": "ศิษย์ใหม่หญิง", "persona": "new", "gender": "female", "expected_ids": ["app-004"]},
+      {"id": "monk", "label_th": "ภิกษุ", "persona": "monk", "gender": "male", "expected_ids": ["app-005"]},
+      {"id": "nun", "label_th": "ภิกษุณี", "persona": "nun", "gender": "female", "expected_ids": ["app-006"]},
+      {"id": "staff_male", "label_th": "ธรรมบริกรชาย", "persona": "staff", "gender": "male", "expected_ids": ["app-007"]},
+      {"id": "staff_female", "label_th": "ธรรมบริกรหญิง", "persona": "staff", "gender": "female", "expected_ids": ["app-008"]}
+    ],
+    "applicant_state_membership": {"include": ["submitted", "under_review", "invited", "confirmed", "checked_in", "completed"], "exclude": ["draft", "withdrawn", "declined_invitation", "rejected"], "unknown_persona": "exclude_from_output_and_emit_audited_unknown_persona"},
+    "teacher_groups": [
+      {"id": "old_men", "label_th": "ศิษย์เก่าชาย", "expected_ids": ["app-001"]},
+      {"id": "new_men", "label_th": "ศิษย์ใหม่ชาย", "expected_ids": ["app-002"]},
+      {"id": "old_women", "label_th": "ศิษย์เก่าหญิง", "expected_ids": ["app-003"]},
+      {"id": "new_women", "label_th": "ศิษย์ใหม่หญิง", "expected_ids": ["app-004"]},
+      {"id": "staff", "label_th": "ธรรมบริกร", "expected_ids": ["app-007", "app-008"]}
+    ],
+    "teacher_state_membership": {"include": ["invited", "confirmed", "checked_in", "completed"], "max_print_selection": 10, "deny_fields": ["national_id", "mental_health", "substance_use"]},
+    "laundry": {"label_th": "ใบส่งซักผ้า", "include": ["confirmed", "checked_in", "completed"], "fields": ["room", "thai_name", "day_01", "day_02", "day_03", "day_04", "day_05", "day_06", "day_07", "day_08", "laundry_cost", "purchase_cost", "total", "facility_need"], "expected_ids": ["app-004", "app-006"]},
+    "surface_expectations": {"screen": "same_rows_and_authorized_fields", "print": "same_rows_and_authorized_fields", "xlsx": "same_rows_and_authorized_fields"},
+    "redaction_cases": [
+      {"capability": "medication.read", "surface": "screen", "expected": "field_redacted"},
+      {"capability": "medication.print", "surface": "print", "expected": "field_redacted"},
+      {"capability": "medication.export", "surface": "xlsx", "expected": "field_redacted"},
+      {"capability": "national_id.full_read", "surface": "all", "expected": "deny"}
+    ]
+  },
+  "notifications": {
+    "local_sender": "tapoda-local-fake@invalid",
+    "retry_minutes": [1, 5, 15],
+    "terminal": ["bounced", "failed"],
+    "variants": [
+      {"id": "welcome", "recipient": "account_owner", "audience": "account", "course": "none", "template": "welcome-v1", "links": ["support"], "attachment": "none", "sender": "tapoda-local-fake@invalid", "retry": "local-retry-v1", "bounce": "terminal-no-state-change", "failure": "no_state_change"},
+      {"id": "password_recovery", "recipient": "account_owner", "audience": "account", "course": "none", "template": "password-recovery-v1", "links": ["one_use_recovery"], "attachment": "none", "sender": "tapoda-local-fake@invalid", "retry": "local-retry-v1", "bounce": "terminal-no-state-change", "failure": "no_state_change"},
+      {"id": "invitation", "recipient": "selected_applicant", "audience": "applicant", "course": "exact_session", "template": "invitation-v1", "links": ["confirm", "cancel"], "attachment": "none", "sender": "tapoda-local-fake@invalid", "retry": "local-retry-v1", "bounce": "terminal-no-state-change", "failure": "no_notified_state"},
+      {"id": "staff_invitation", "recipient": "selected_staff_applicant", "audience": "staff_applicant", "course": "exact_session", "template": "staff-invitation-v1", "links": ["confirm", "cancel"], "attachment": "none", "sender": "tapoda-local-fake@invalid", "retry": "local-retry-v1", "bounce": "terminal-no-state-change", "failure": "no_notified_state"},
+      {"id": "confirmation_d03", "recipient": "confirmed_participant", "audience": "d03", "course": "exact_session", "template": "confirmation-d03-v1", "links": ["support"], "attachment": "approved-document-key:training-intro", "sender": "tapoda-local-fake@invalid", "retry": "local-retry-v1", "bounce": "terminal-no-state-change", "failure": "no_state_change"},
+      {"id": "confirmation_d10", "recipient": "confirmed_participant", "audience": "d10", "course": "exact_session", "template": "confirmation-d10-v1", "links": ["support"], "attachment": "approved-document-key:training-intro", "sender": "tapoda-local-fake@invalid", "retry": "local-retry-v1", "bounce": "terminal-no-state-change", "failure": "no_state_change"},
+      {"id": "confirmation_monastic_d10", "recipient": "confirmed_participant", "audience": "monastic_d10", "course": "exact_session", "template": "confirmation-monastic-d10-v1", "links": ["support"], "attachment": "approved-document-key:training-intro", "sender": "tapoda-local-fake@invalid", "retry": "local-retry-v1", "bounce": "terminal-no-state-change", "failure": "no_state_change"},
+      {"id": "confirmation_staff", "recipient": "confirmed_participant", "audience": "staff", "course": "exact_session", "template": "confirmation-staff-v1", "links": ["support"], "attachment": "approved-document-key:practice", "sender": "tapoda-local-fake@invalid", "retry": "local-retry-v1", "bounce": "terminal-no-state-change", "failure": "no_state_change"},
+      {"id": "request_confirmation", "recipient": "invited_participant", "audience": "invited", "course": "exact_session", "template": "request-confirmation-v1", "links": ["confirm", "cancel"], "attachment": "approved-document-key:training-intro", "sender": "tapoda-local-fake@invalid", "retry": "local-retry-v1", "bounce": "terminal-no-state-change", "failure": "no_notified_state"},
+      {"id": "cancellation", "recipient": "applicant", "audience": "applicant", "course": "exact_session", "template": "cancellation-v1", "links": ["support"], "attachment": "none", "sender": "tapoda-local-fake@invalid", "retry": "local-retry-v1", "bounce": "terminal-no-state-change", "failure": "no_state_change"},
+      {"id": "operational", "recipient": "authorized_operational_recipient", "audience": "operations", "course": "exact_session", "template": "operational-v1", "links": ["support"], "attachment": "none", "sender": "tapoda-local-fake@invalid", "retry": "local-retry-v1", "bounce": "terminal-no-state-change", "failure": "no_state_change"}
+    ],
+    "fixture_events": ["queued", "sent", "failed_retry_1", "failed_retry_2", "failed_terminal", "bounced"]
+  },
+  "thai_id": {
+    "challenge_claims": ["iss", "kid", "jti", "nonce", "actor_account_id", "session_id", "action", "course_session_id", "aud", "origin", "exp"],
+    "required_values": {"action": "identity.verify", "aud": "tapoda-thai-id-companion", "origin": "https://tapoda.local"},
+    "consume": "atomic_jti_and_nonce_before_verification_event",
+    "rejections": ["unknown_issuer", "unknown_kid", "bad_signature", "expired", "audience_mismatch", "action_mismatch", "origin_mismatch", "actor_mismatch", "session_mismatch", "course_session_mismatch", "jti_mismatch", "nonce_mismatch", "already_consumed"],
+    "audit_outcome": "rejected_without_card_data"
+  }
+}

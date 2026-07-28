@@ -21,7 +21,7 @@ Produce approved fixtures and matrices for every report, export, print, email, d
 
 ## Local completion record
 
-2026-07-29 — [Local output, communication, document, and device contracts](../../../docs/decisions/local/output-device-contracts.md) defines executable local defaults and excludes owner signoff.
+2026-07-29 — [Local output, communication, document, and device contracts](../../../docs/decisions/local/output-device-contracts.md), [synthetic fixture](../../../docs/decisions/local/output-device-fixtures.json), and [deterministic validator](../../../docs/decisions/local/validate-local-contract-fixtures.mjs) define executable local defaults and exclude owner signoff.
 
 ## Blocked by
 
