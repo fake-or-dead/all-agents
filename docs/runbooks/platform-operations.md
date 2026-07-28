@@ -5,12 +5,15 @@
 Build once from a clean, reviewed commit:
 
 ```sh
-bin/build-artifact 2026.07.29.1 FULL_GIT_COMMIT
+export APP_BUILD_VERSION=2026.07.29.1
+export APP_BUILD_COMMIT=FULL_GIT_COMMIT
+bin/build-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT"
+export TAPODA_APP_IMAGE="$(docker image inspect --format '{{.Id}}' "tapoda-next:${APP_BUILD_VERSION}")"
 ```
 
-Record the image digest emitted by `docker image inspect`. Promote that exact digest to migration, web, worker, and scheduler processes. Do not rebuild per environment. Inject secrets and environment-specific adapter names at runtime.
+Record the content-addressed image ID emitted by `docker image inspect`. Keep `TAPODA_APP_IMAGE`, `APP_BUILD_VERSION`, and `APP_BUILD_COMMIT` exported for every Compose command in the deployment or restore session. Promote that exact image ID to migration, web, worker, and scheduler processes. Do not rebuild per environment. Inject secrets and environment-specific adapter names at runtime.
 
-The platform maintainer owns container-input refreshes. Resolve each declared version tag to a reviewed digest in a dedicated dependency PR, update `Dockerfile`, `compose.yaml`, `bin/bootstrap-env`, and documented tool commands together, then rerun clean test/runtime/Compose builds, audits, browser checks, artifact identity, and smoke before approval. Never refresh a digest during deployment.
+The platform maintainer owns container-input refreshes. Resolve the Dockerfile syntax frontend and each declared version tag to a reviewed digest in a dedicated dependency PR, update `Dockerfile`, `compose.yaml`, `bin/bootstrap-env`, and documented tool commands together, then rerun clean test/runtime/Compose builds, audits, browser checks, artifact identity, and smoke before approval. Never refresh a digest during deployment.
 
 Required production adapters:
 
@@ -31,6 +34,16 @@ Required production adapters:
 
 Do not serve traffic from the migration process. Liveness proves the process can answer; readiness proves dependencies and operational heartbeats are current.
 
+The local immutable deployment rehearsal uses the same exported artifact for every process:
+
+```sh
+docker compose up --detach postgres redis
+docker compose --profile tools up --no-deps --abort-on-container-exit --exit-code-from migrate migrate
+docker compose up --detach web worker scheduler
+bin/assert-runtime-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT" migrate web worker scheduler
+bin/smoke http://127.0.0.1:8080
+```
+
 ## Monitoring
 
 Alert on:
@@ -50,7 +63,18 @@ Before any incompatible write, route traffic back to the previously recorded ima
 
 Outbox delivery is at least once. Worker completion is idempotent by correlation ID. A crash can cause a repeated adapter call; adapters must return one effective result.
 
+Structured-log completion reserves a durable `pending` receipt before the effect and marks it `delivered` only after the logger returns successfully. A failed effect leaves the receipt pending for retry. A process loss after the effect but before the delivered-state commit can repeat the effect, so every provider/log consumer must deduplicate the `delivery_key` correlation ID. The database receipt never converts a failed effect into success.
+
 ## Backup and restore drill
+
+Use the reviewed artifact exports from **Artifact and release identity**. Compose refuses to start application services without `TAPODA_APP_IMAGE`.
+
+Seed one pre-backup marker entirely through the source PostgreSQL container:
+
+```sh
+export RESTORE_MARKER_ID=00000000-0000-4000-8000-000000000909
+docker compose exec -T postgres psql --username=tapoda --dbname=tapoda --command="INSERT INTO audit_events (id, actor_type, actor_id, action, resource_type, resource_id, outcome, correlation_id, context, occurred_at) VALUES ('${RESTORE_MARKER_ID}', 'restore-marker', 'pre-backup', 'platform.restore.marker', 'platform_restore', '00000000-0000-4000-8000-000000000910', 'recorded', '00000000-0000-4000-8000-000000000911', '{\"purpose\":\"non-destructive-restore-check\"}', CURRENT_TIMESTAMP) ON CONFLICT (id) DO NOTHING"
+```
 
 Create a custom-format backup without writing credentials to the command line:
 
@@ -63,7 +87,7 @@ Restore only into an isolated empty PostgreSQL instance:
 ```sh
 docker compose --profile restore up --detach --force-recreate postgres-restore redis-restore
 docker compose --profile restore exec -T postgres-restore pg_restore --exit-on-error --no-owner --username=tapoda --dbname=tapoda_restore < tapoda.dump
-docker compose --profile restore run --rm restore-migrate
+docker compose --profile restore up --no-deps --abort-on-container-exit --exit-code-from restore-migrate restore-migrate
 ```
 
 Reconcile the source and restored data before starting processes that write heartbeats. Both database commands execute inside their local PostgreSQL containers:
@@ -73,19 +97,29 @@ docker compose exec -T postgres sh -c 'for table in platform_probe_runs audit_ev
 docker compose --profile restore exec -T postgres-restore sh -c 'for table in platform_probe_runs audit_events outbox_events platform_completion_receipts; do printf "%s\n" "$table"; psql --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" --command="COPY (SELECT row_to_json(t)::text AS row FROM public.$table AS t ORDER BY row) TO STDOUT"; done | sha256sum'
 ```
 
-The digests must match. Then verify the restored runtime and audited path:
+The digests must match. Confirm the pre-backup marker exists, start only the exact reviewed web artifact, and run the non-destructive verifier. It adds one uniquely correlated probe, two audit events, one processed outbox event, and the adapter-specific completion receipt delta without resetting the schema or deleting existing rows:
 
 ```sh
-docker compose --profile restore up --detach restore-web restore-worker restore-scheduler
-bin/smoke http://127.0.0.1:18080
-docker compose --profile restore run --rm restore-test php artisan test --filter=AuditedPlatformPathTest
+docker compose --profile restore exec -T postgres-restore psql --username=tapoda --dbname=tapoda_restore --tuples-only --no-align --command="SELECT count(*) FROM audit_events WHERE id = '${RESTORE_MARKER_ID}'"
+docker compose --profile restore up --detach restore-web
+bin/assert-runtime-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT" restore-migrate restore-web
+docker compose --profile restore exec -T restore-web php artisan platform:verify-restored-audited-path --marker-id="$RESTORE_MARKER_ID"
+docker compose --profile restore exec -T postgres-restore psql --username=tapoda --dbname=tapoda_restore --tuples-only --no-align --command="SELECT count(*) FROM audit_events WHERE id = '${RESTORE_MARKER_ID}'"
 ```
 
-Record restore, migration, checksum, readiness, smoke, audited-probe, and elapsed-time results as simulated evidence only. Remove the ephemeral restore topology with:
+Both marker queries must return `1`. Then start the remaining exact reviewed processes, assert every container image ID and revision label, and smoke the ready topology:
 
 ```sh
-docker compose --profile restore stop postgres-restore redis-restore restore-web restore-worker restore-scheduler
-docker compose --profile restore rm --force postgres-restore redis-restore restore-web restore-worker restore-scheduler
+docker compose --profile restore up --detach restore-worker restore-scheduler
+bin/assert-runtime-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT" restore-migrate restore-web restore-worker restore-scheduler
+bin/smoke http://127.0.0.1:18080
+```
+
+Record artifact assertions, restore, migration, checksum, marker preservation, audited-path deltas, readiness, smoke, and elapsed-time results as simulated evidence only. Remove the ephemeral restore topology with:
+
+```sh
+docker compose --profile restore stop postgres-restore redis-restore restore-migrate restore-web restore-worker restore-scheduler
+docker compose --profile restore rm --force postgres-restore redis-restore restore-migrate restore-web restore-worker restore-scheduler
 ```
 
 Its PostgreSQL data is tmpfs-backed and disappears with the removed container. The restore Redis/Horizon namespace is isolated so its worker heartbeat cannot be consumed by the primary local stack. This does not establish production RPO/RTO.

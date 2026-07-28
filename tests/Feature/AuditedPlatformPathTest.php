@@ -3,11 +3,13 @@
 namespace Tests\Feature;
 
 use App\Modules\PlatformOperations\Contracts\CompletionAdapter;
+use App\Modules\PlatformOperations\Contracts\PlatformProbeWorker;
 use App\Modules\PlatformOperations\Infrastructure\Completion\StructuredLogCompletionAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Mockery;
 use Psr\Log\LoggerInterface;
+use RuntimeException;
 use Tests\TestCase;
 
 final class AuditedPlatformPathTest extends TestCase
@@ -139,6 +141,11 @@ final class AuditedPlatformPathTest extends TestCase
         $this->artisan('platform:relay-outbox')->assertSuccessful();
 
         $this->assertDatabaseCount('platform_completion_receipts', 1);
+        $this->assertDatabaseHas('platform_completion_receipts', [
+            'correlation_id' => $probe->correlation_id,
+            'status' => 'delivered',
+            'attempts' => 1,
+        ]);
         $this->assertDatabaseHas('platform_probe_runs', [
             'id' => $probe->id,
             'status' => 'completed',
@@ -146,6 +153,105 @@ final class AuditedPlatformPathTest extends TestCase
         ]);
         $this->assertDatabaseCount('audit_events', 2);
         $this->assertDatabaseCount('outbox_events', 1);
+    }
+
+    public function test_pending_completion_is_retried_after_effect_failure(): void
+    {
+        $deliveryAttempts = 0;
+        $effectiveDeliveries = [];
+        $logger = Mockery::mock(LoggerInterface::class);
+        $logger
+            ->shouldReceive('info')
+            ->twice()
+            ->with('Platform probe completed.', Mockery::on(
+                fn (array $context): bool => isset(
+                    $context['probe_id'],
+                    $context['correlation_id'],
+                    $context['delivery_key'],
+                ),
+            ))
+            ->andReturnUsing(function (string $message, array $context) use (
+                &$deliveryAttempts,
+                &$effectiveDeliveries,
+            ): void {
+                $deliveryAttempts++;
+                $this->assertDatabaseHas('platform_completion_receipts', [
+                    'correlation_id' => $context['correlation_id'],
+                    'status' => 'pending',
+                    'delivered_at' => null,
+                ]);
+
+                if ($deliveryAttempts === 1) {
+                    throw new RuntimeException('Injected failure before observable completion.');
+                }
+
+                $effectiveDeliveries[$context['delivery_key']] = $message;
+            });
+        $adapter = new StructuredLogCompletionAdapter(DB::connection(), $logger);
+        $this->app->instance(CompletionAdapter::class, $adapter);
+
+        $accepted = $this
+            ->withHeaders([
+                'Idempotency-Key' => 'probe-20260729-effect-retry',
+                'X-Tapoda-Test-Actor' => 'platform-operator',
+            ])
+            ->postJson('/platform/probes')
+            ->assertAccepted();
+        $probe = DB::table('platform_probe_runs')->find($accepted->json('data.id'));
+        $outbox = DB::table('outbox_events')->where('aggregate_id', $probe->id)->first();
+
+        try {
+            $this->app
+                ->make(PlatformProbeWorker::class)
+                ->completeOutboxEvent($outbox->id);
+            $this->fail('The injected delivery failure was not thrown.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(
+                'Injected failure before observable completion.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertDatabaseHas('platform_completion_receipts', [
+            'correlation_id' => $probe->correlation_id,
+            'status' => 'pending',
+            'attempts' => 1,
+            'delivered_at' => null,
+        ]);
+        $this->assertDatabaseHas('platform_probe_runs', [
+            'id' => $probe->id,
+            'status' => 'processing',
+            'completion_code' => null,
+        ]);
+        $this->assertDatabaseHas('outbox_events', [
+            'id' => $outbox->id,
+            'processed_at' => null,
+            'claimed_at' => null,
+        ]);
+        $this->assertDatabaseCount('audit_events', 1);
+        $this->assertSame([], $effectiveDeliveries);
+
+        $this->app
+            ->make(PlatformProbeWorker::class)
+            ->completeOutboxEvent($outbox->id);
+
+        $this->assertDatabaseHas('platform_completion_receipts', [
+            'correlation_id' => $probe->correlation_id,
+            'status' => 'delivered',
+            'attempts' => 2,
+        ]);
+        $this->assertDatabaseHas('platform_probe_runs', [
+            'id' => $probe->id,
+            'status' => 'completed',
+            'completion_code' => 'structured-log.completed',
+        ]);
+        $this->assertDatabaseCount('audit_events', 2);
+        $this->assertCount(1, $effectiveDeliveries);
+
+        $adapter->complete($probe->id, $probe->correlation_id);
+
+        $this->assertSame(2, $deliveryAttempts);
+        $this->assertCount(1, $effectiveDeliveries);
     }
 
     public function test_production_actor_adapter_ignores_the_test_header(): void

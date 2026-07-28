@@ -15,6 +15,7 @@ use App\Modules\PlatformOperations\Infrastructure\Completion\DeterministicFakeCo
 use App\Modules\PlatformOperations\Infrastructure\Completion\StructuredLogCompletionAdapter;
 use App\Modules\PlatformOperations\Infrastructure\Console\RecordSchedulerHeartbeat;
 use App\Modules\PlatformOperations\Infrastructure\Console\RelayPlatformOutbox;
+use App\Modules\PlatformOperations\Infrastructure\Console\VerifyRestoredAuditedPath;
 use App\Modules\PlatformOperations\Infrastructure\Health\InfrastructureReadinessChecks;
 use App\Modules\PlatformOperations\Infrastructure\Persistence\DatabasePlatformProbes;
 use App\Modules\PlatformOperations\Infrastructure\Queue\DatabasePlatformProbeWorker;
@@ -30,6 +31,7 @@ final class PlatformServiceProvider extends ServiceProvider
             $this->commands([
                 RecordSchedulerHeartbeat::class,
                 RelayPlatformOutbox::class,
+                VerifyRestoredAuditedPath::class,
             ]);
         }
     }

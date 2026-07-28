@@ -1,0 +1,44 @@
+#!/bin/sh
+set -eu
+
+expected_version="${1:?Usage: TAPODA_APP_IMAGE=sha256:... bin/assert-runtime-artifact VERSION COMMIT SERVICE...}"
+expected_commit="${2:?Usage: TAPODA_APP_IMAGE=sha256:... bin/assert-runtime-artifact VERSION COMMIT SERVICE...}"
+shift 2
+
+if [ "$#" -eq 0 ]; then
+    echo "At least one Compose service is required." >&2
+    exit 1
+fi
+
+expected_image="${TAPODA_APP_IMAGE:?Export the reviewed content-addressed image ID}"
+expected_image_id="$(docker image inspect --format '{{.Id}}' "${expected_image}")"
+
+for service in "$@"; do
+    container_id="$(docker compose --profile tools --profile restore ps --all --quiet "${service}" | tail -n 1)"
+
+    if [ -z "${container_id}" ]; then
+        echo "Compose service ${service} has no container to inspect." >&2
+        exit 1
+    fi
+
+    actual_image_id="$(docker container inspect --format '{{.Image}}' "${container_id}")"
+    actual_version="$(docker container inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "${container_id}")"
+    actual_commit="$(docker container inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "${container_id}")"
+
+    if [ "${actual_image_id}" != "${expected_image_id}" ]; then
+        echo "${service} image mismatch: expected ${expected_image_id}, got ${actual_image_id}." >&2
+        exit 1
+    fi
+
+    if [ "${actual_version}" != "${expected_version}" ]; then
+        echo "${service} version mismatch: expected ${expected_version}, got ${actual_version}." >&2
+        exit 1
+    fi
+
+    if [ "${actual_commit}" != "${expected_commit}" ]; then
+        echo "${service} commit mismatch: expected ${expected_commit}, got ${actual_commit}." >&2
+        exit 1
+    fi
+
+    echo "${service}: image=${actual_image_id} version=${actual_version} commit=${actual_commit}"
+done

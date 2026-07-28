@@ -11,7 +11,7 @@ description = "Deterministic audited-platform idempotency fixtures"
 condition = "AND"
 regexTarget = "secret"
 regexes = [
-  '''^probe-20260729-(?:001|unauthorized|idempotent|shared-key|private|crash-window|production)$''',
+  '''^probe-20260729-(?:001|unauthorized|idempotent|shared-key|private|crash-window|effect-retry|production)$''',
 ]
 paths = [
   '''^tests/Feature/AuditedPlatformPathTest\.php$''',

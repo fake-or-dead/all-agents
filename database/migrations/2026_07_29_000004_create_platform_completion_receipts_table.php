@@ -13,7 +13,10 @@ return new class extends Migration
             $table->uuid('probe_id');
             $table->string('adapter', 64);
             $table->string('completion_code', 128);
-            $table->timestampTz('completed_at');
+            $table->string('status', 32)->default('pending');
+            $table->unsignedInteger('attempts')->default(0);
+            $table->timestampTz('reserved_at');
+            $table->timestampTz('delivered_at')->nullable();
         });
     }
 

@@ -8,8 +8,6 @@ x-app-environment: &app-environment
   APP_LOCALE: th
   APP_FALLBACK_LOCALE: th
   APP_KEY: ${APP_KEY:?Run bin/bootstrap-env first}
-  APP_BUILD_VERSION: ${APP_BUILD_VERSION:-local}
-  APP_BUILD_COMMIT: ${APP_BUILD_COMMIT:-unknown}
   LOG_CHANNEL: stderr
   DB_CONNECTION: pgsql
   DB_HOST: postgres
@@ -37,13 +35,8 @@ x-restore-environment: &restore-environment
   HORIZON_PREFIX: tapoda_restore_horizon
 
 x-app: &app
-  image: tapoda-next:${APP_BUILD_VERSION:-local}
-  build:
-    context: .
-    target: runtime
-    args:
-      APP_BUILD_VERSION: ${APP_BUILD_VERSION:-local}
-      APP_BUILD_COMMIT: ${APP_BUILD_COMMIT:-unknown}
+  image: ${TAPODA_APP_IMAGE:?Build a reviewed artifact and export TAPODA_APP_IMAGE}
+  pull_policy: never
   environment: *app-environment
   depends_on:
     postgres:
@@ -132,28 +125,6 @@ services:
     <<: *restore-app
     command: ["php", "artisan", "migrate", "--force"]
     restart: "no"
-    healthcheck:
-      disable: true
-
-  restore-test:
-    build:
-      context: .
-      target: test
-    profiles: ["restore"]
-    environment:
-      <<: *restore-environment
-      APP_ENV: testing
-      APP_DEBUG: "true"
-      CACHE_STORE: array
-      QUEUE_CONNECTION: sync
-      SESSION_DRIVER: array
-      PLATFORM_ACTOR_ADAPTER: test-header
-      PLATFORM_COMPLETION_ADAPTER: deterministic-fake
-    depends_on:
-      postgres-restore:
-        condition: service_healthy
-      redis-restore:
-        condition: service_healthy
     healthcheck:
       disable: true
 
