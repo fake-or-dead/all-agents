@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+base_url="${1:-http://127.0.0.1:8080}"
+temporary_directory="$(mktemp -d)"
+trap 'rm -rf "${temporary_directory}"' EXIT
+
+curl --fail --silent --show-error "${base_url}/health/live" > "${temporary_directory}/live.json"
+curl --fail --silent --show-error "${base_url}/health/ready" > "${temporary_directory}/ready.json"
+curl --fail --silent --show-error "${base_url}/" > "${temporary_directory}/home.html"
+
+grep -q '"status":"ok"' "${temporary_directory}/live.json"
+grep -q '"status":"ready"' "${temporary_directory}/ready.json"
+grep -q 'lang="th"' "${temporary_directory}/home.html"
+
+if grep -Eiq 'password|secret|dsn|DB_HOST' "${temporary_directory}/live.json" "${temporary_directory}/ready.json"; then
+    echo "Health response contains a forbidden connection or secret field." >&2
+    exit 1
+fi
+
+echo "Smoke checks passed: ${base_url}"

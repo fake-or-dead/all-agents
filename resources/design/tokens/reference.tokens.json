@@ -1,0 +1,14 @@
+{
+    "color": {
+        "stone-50": { "value": "#f7f4f1" },
+        "stone-100": { "value": "#eee8e3" },
+        "stone-500": { "value": "#765b49" },
+        "stone-700": { "value": "#594235" },
+        "green-700": { "value": "#176b49" },
+        "blue-700": { "value": "#285c8c" },
+        "amber-800": { "value": "#8a5700" },
+        "red-700": { "value": "#a32929" },
+        "white": { "value": "#ffffff" },
+        "ink": { "value": "#251f1b" }
+    }
+}

@@ -1,0 +1,120 @@
+name: tapoda-next
+
+x-app-environment: &app-environment
+  APP_NAME: Tapoda Next
+  APP_ENV: local
+  APP_DEBUG: "false"
+  APP_URL: http://localhost:8080
+  APP_LOCALE: th
+  APP_FALLBACK_LOCALE: th
+  APP_KEY: ${APP_KEY:?Run bin/bootstrap-env first}
+  APP_BUILD_VERSION: ${APP_BUILD_VERSION:-local}
+  APP_BUILD_COMMIT: ${APP_BUILD_COMMIT:-unknown}
+  LOG_CHANNEL: stderr
+  DB_CONNECTION: pgsql
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_DATABASE: ${POSTGRES_DB:-tapoda}
+  DB_USERNAME: ${POSTGRES_USER:-tapoda}
+  DB_PASSWORD: ${POSTGRES_PASSWORD:?Run bin/bootstrap-env first}
+  CACHE_STORE: redis
+  QUEUE_CONNECTION: redis
+  SESSION_DRIVER: redis
+  REDIS_CLIENT: phpredis
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: "null"
+  HORIZON_PREFIX: tapoda_local_horizon
+  PLATFORM_ACTOR_ADAPTER: laravel-auth
+  PLATFORM_COMPLETION_ADAPTER: ${PLATFORM_COMPLETION_ADAPTER:-deterministic-fake}
+
+x-app: &app
+  image: tapoda-next:${APP_BUILD_VERSION:-local}
+  build:
+    context: .
+    target: runtime
+    args:
+      APP_BUILD_VERSION: ${APP_BUILD_VERSION:-local}
+      APP_BUILD_COMMIT: ${APP_BUILD_COMMIT:-unknown}
+  environment: *app-environment
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  web:
+    <<: *app
+    ports:
+      - "8080:8080"
+
+  worker:
+    <<: *app
+    command: ["php", "artisan", "horizon"]
+    healthcheck:
+      disable: true
+
+  scheduler:
+    <<: *app
+    command: ["php", "artisan", "schedule:work"]
+    healthcheck:
+      disable: true
+
+  migrate:
+    <<: *app
+    profiles: ["tools"]
+    command: ["php", "artisan", "migrate", "--force"]
+    restart: "no"
+    healthcheck:
+      disable: true
+
+  test:
+    build:
+      context: .
+      target: test
+    profiles: ["tools"]
+    environment:
+      <<: *app-environment
+      APP_ENV: testing
+      APP_DEBUG: "true"
+      DB_DATABASE: ${POSTGRES_DB:-tapoda}
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+      PLATFORM_ACTOR_ADAPTER: test-header
+      PLATFORM_COMPLETION_ADAPTER: deterministic-fake
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
+  postgres:
+    image: postgres:18-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tapoda}
+      POSTGRES_USER: ${POSTGRES_USER:-tapoda}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run bin/bootstrap-env first}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:8.4-bookworm
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-data:

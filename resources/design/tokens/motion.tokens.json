@@ -1,0 +1,7 @@
+{
+    "motion": {
+        "fast": { "value": "120ms" },
+        "normal": { "value": "200ms" },
+        "ease": { "value": "cubic-bezier(0.2, 0, 0, 1)" }
+    }
+}

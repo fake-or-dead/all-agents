@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - integration/local-complete
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build locked PHP 8.5 test image
+        run: docker build --target test --tag tapoda-next:test .
+      - name: Backend, architecture, and security checks
+        run: |
+          docker run --rm tapoda-next:test composer validate --strict --no-check-publish
+          docker run --rm tapoda-next:test composer audit --locked
+          docker run --rm tapoda-next:test vendor/bin/pint --test app routes tests database config bootstrap/app.php bootstrap/providers.php
+          docker run --rm tapoda-next:test php tools/architecture-check.php
+          docker run --rm tapoda-next:test vendor/bin/phpstan analyse --memory-limit=512M
+          docker run --rm tapoda-next:test php vendor/bin/phpunit
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run tokens:check
+      - run: npm run build
+      - run: npm run bundle:check
+
+  browser:
+    runs-on: ubuntu-latest
+    env:
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      POSTGRES_PASSWORD: issue09-ci-database-password
+      APP_BUILD_VERSION: ci
+      APP_BUILD_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: docker compose build
+      - run: docker compose up -d postgres redis
+      - run: docker compose --profile tools run --rm migrate
+      - run: docker compose up -d web worker scheduler
+      - run: npm run test:browser
+      - if: failure()
+        run: docker compose logs --no-color
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2

@@ -1,0 +1,20 @@
+{
+	auto_https off
+	admin off
+}
+
+:8080 {
+	root * /app/public
+	encode zstd br gzip
+
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), geolocation=(), microphone=()"
+		-X-Powered-By
+	}
+
+	php_server
+}
