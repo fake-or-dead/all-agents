@@ -28,11 +28,12 @@ Required production adapters:
 2. Run `php artisan migrate --pretend` with the candidate image. Review SQL for backward compatibility.
 3. Run `php artisan migrate --force` once with the candidate image.
 4. Start web, Horizon worker, and scheduler from the same image digest.
-5. Wait for `/health/ready` to report database, Redis, worker, scheduler, and migration status `ok`.
-6. Run `bin/smoke https://TARGET_HOST`.
-7. Record image digest, migration batch, deployment time, and smoke result.
+5. Run the bounded `bin/smoke https://TARGET_HOST` gate. It polls until liveness is `ok`, readiness reports every dependency `ok`, and the Thai home page succeeds.
+6. Record image digest, migration batch, deployment time, smoke deadline, and result.
 
 Do not serve traffic from the migration process. Liveness proves the process can answer; readiness proves dependencies and operational heartbeats are current.
+
+Every documented smoke invocation uses one 60-second overall deadline across all three checks, a two-second connection timeout, a five-second per-request response timeout, and a one-second retry interval. Timeout failure reports the endpoint, attempt count, last HTTP/curl result, and response size without printing response content. This gate bounds a cold application start and an accepted-but-stalled HTTP response; detached container startup alone is not application readiness.
 
 The local immutable deployment rehearsal uses the same exported artifact for every process:
 
@@ -41,6 +42,10 @@ docker compose up --detach --wait --wait-timeout 60 postgres redis
 docker compose --profile tools up --no-deps --abort-on-container-exit --exit-code-from migrate migrate
 docker compose up --detach web worker scheduler
 bin/assert-runtime-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT" migrate web worker scheduler
+SMOKE_OVERALL_TIMEOUT_SECONDS=60 \
+SMOKE_CONNECT_TIMEOUT_SECONDS=2 \
+SMOKE_REQUEST_TIMEOUT_SECONDS=5 \
+SMOKE_RETRY_INTERVAL_SECONDS=1 \
 bin/smoke http://127.0.0.1:8080
 ```
 
@@ -112,6 +117,10 @@ Both marker queries must return `1`. Then start the remaining exact reviewed pro
 ```sh
 docker compose --profile restore up --detach restore-worker restore-scheduler
 bin/assert-runtime-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT" restore-migrate restore-web restore-worker restore-scheduler
+SMOKE_OVERALL_TIMEOUT_SECONDS=60 \
+SMOKE_CONNECT_TIMEOUT_SECONDS=2 \
+SMOKE_REQUEST_TIMEOUT_SECONDS=5 \
+SMOKE_RETRY_INTERVAL_SECONDS=1 \
 bin/smoke http://127.0.0.1:18080
 ```
 

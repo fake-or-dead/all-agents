@@ -54,6 +54,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
+      - run: npm run test:smoke
       - run: npx playwright install --with-deps chromium
       - name: Build exact browser runtime artifact
         run: |
@@ -63,6 +64,13 @@ jobs:
       - run: docker compose --profile tools up --no-deps --abort-on-container-exit --exit-code-from migrate migrate
       - run: docker compose up -d web worker scheduler
       - run: bin/assert-runtime-artifact ci "${GITHUB_SHA}" migrate web worker scheduler
+      - name: Wait for bounded application readiness
+        run: bin/smoke http://127.0.0.1:8080
+        env:
+          SMOKE_OVERALL_TIMEOUT_SECONDS: 60
+          SMOKE_CONNECT_TIMEOUT_SECONDS: 2
+          SMOKE_REQUEST_TIMEOUT_SECONDS: 5
+          SMOKE_RETRY_INTERVAL_SECONDS: 1
       - run: npm run test:browser
       - if: failure()
         run: docker compose logs --no-color

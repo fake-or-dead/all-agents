@@ -16,10 +16,14 @@ docker compose up -d --wait --wait-timeout 60 postgres redis
 docker compose --profile tools up --no-deps --abort-on-container-exit --exit-code-from migrate migrate
 docker compose up -d web worker scheduler
 bin/assert-runtime-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT" migrate web worker scheduler
+SMOKE_OVERALL_TIMEOUT_SECONDS=60 \
+SMOKE_CONNECT_TIMEOUT_SECONDS=2 \
+SMOKE_REQUEST_TIMEOUT_SECONDS=5 \
+SMOKE_RETRY_INTERVAL_SECONDS=1 \
 bin/smoke http://127.0.0.1:8080
 ```
 
-Open <http://127.0.0.1:8080>. Stop with `docker compose stop`.
+The smoke gate polls liveness, readiness, and the Thai home page under one 60-second deadline. Every request has a two-second connection timeout and five-second response timeout. Failure reports the endpoint, attempts, HTTP/curl result, and response size without printing response content. Open <http://127.0.0.1:8080>. Stop with `docker compose stop`.
 
 ## Checks
 
