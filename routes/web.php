@@ -25,7 +25,7 @@ Route::post('/platform/probes', [PlatformProbeController::class, 'store']);
 Route::get('/platform/probes/{probeId}', [PlatformProbeController::class, 'show'])
     ->whereUuid('probeId');
 
-Route::get('/', function () {
+Route::get('/_local/system-state', function () {
     return Inertia::render('SystemState', [
         'build' => [
             'version' => (string) config('platform.build.version'),
@@ -33,3 +33,6 @@ Route::get('/', function () {
         ],
     ]);
 })->name('system-state');
+
+require __DIR__.'/course-catalog.php';
+require __DIR__.'/reference-data.php';

@@ -87,7 +87,7 @@ test("Thai system state is accessible and keyboard operable", async ({
     page,
 }) => {
     await mockReadiness(page);
-    await page.goto("/");
+    await page.goto("/_local/system-state");
 
     await expect(page.locator("html")).toHaveAttribute("lang", "th");
     await expect(
@@ -115,7 +115,7 @@ test("degraded state exposes failed, stale, and pending checks accessibly", asyn
 }) => {
     await mockReadiness(page, degradedResponse, 503);
     await page.setViewportSize({ width: 320, height: 800 });
-    await page.goto("/");
+    await page.goto("/_local/system-state");
 
     await expect(
         page.getByRole("heading", { level: 2, name: "ระบบยังไม่พร้อม" }),
@@ -165,7 +165,7 @@ test("unavailable state announces failure and refresh recovery", async ({
             body: JSON.stringify(readyResponse),
         });
     });
-    await page.goto("/");
+    await page.goto("/_local/system-state");
 
     await expect(page.getByRole("alert")).toContainText(
         "ไม่สามารถอ่านสถานะได้ในขณะนี้",
@@ -192,7 +192,7 @@ test("unavailable state announces failure and refresh recovery", async ({
 test("system state reflows at 320px and 200 percent zoom", async ({ page }) => {
     await mockReadiness(page);
     await page.setViewportSize({ width: 320, height: 800 });
-    await page.goto("/");
+    await page.goto("/_local/system-state");
     await expect(
         page.getByRole("heading", { level: 2, name: "ระบบพร้อมใช้งาน" }),
     ).toBeVisible();
@@ -215,7 +215,7 @@ test("system state reflows at 320px and 200 percent zoom", async ({ page }) => {
 
 test("system state visual baseline", async ({ page }) => {
     await mockReadiness(page);
-    await page.goto("/");
+    await page.goto("/_local/system-state");
     await expect(
         page.getByRole("heading", { level: 2, name: "ระบบพร้อมใช้งาน" }),
     ).toBeVisible();
