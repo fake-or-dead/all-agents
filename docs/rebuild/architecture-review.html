@@ -1,0 +1,1482 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review — Tapoda Next</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "neutral",
+        securityLevel: "strict",
+        flowchart: { curve: "basis", htmlLabels: true },
+        themeVariables: {
+          fontFamily: "ui-sans-serif, system-ui, sans-serif",
+          primaryColor: "#eef2ff",
+          primaryBorderColor: "#4f46e5",
+          lineColor: "#64748b"
+        }
+      });
+    </script>
+    <style>
+      :root { color-scheme: light; }
+      html { scroll-behavior: smooth; }
+      body {
+        background:
+          radial-gradient(circle at 92% 2%, rgba(99,102,241,.09), transparent 25rem),
+          #fafaf9;
+      }
+      .seam { border-style: dashed; }
+      .leak { color: #dc2626; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .paper-grid {
+        background-image:
+          linear-gradient(rgba(148,163,184,.09) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(148,163,184,.09) 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
+      .eyebrow { letter-spacing: .16em; text-transform: uppercase; }
+      .phone {
+        width: 250px;
+        min-height: 500px;
+        border: 8px solid #0f172a;
+        border-radius: 32px;
+        box-shadow: 0 20px 50px rgba(15,23,42,.18);
+      }
+      .browser-frame {
+        border: 1px solid #cbd5e1;
+        border-radius: 16px;
+        box-shadow: 0 18px 45px rgba(15,23,42,.1);
+        overflow: hidden;
+      }
+      .status-dot::before {
+        content: "";
+        display: inline-block;
+        width: .5rem;
+        height: .5rem;
+        border-radius: 9999px;
+        background: currentColor;
+        margin-right: .4rem;
+      }
+      .metric {
+        font-variant-numeric: tabular-nums;
+      }
+      @media print {
+        nav { display: none !important; }
+        body { background: white; }
+        section, article { break-inside: avoid; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body class="text-slate-900 antialiased">
+    <a class="sr-only z-[60] rounded bg-white p-3 text-indigo-800 focus:not-sr-only focus:fixed focus:left-3 focus:top-3" href="#top">Skip to report content</a>
+    <nav aria-label="Report sections" class="sticky top-0 z-50 border-b border-slate-200/80 bg-stone-50/90 backdrop-blur">
+      <div class="mx-auto flex max-w-7xl items-center gap-5 overflow-x-auto px-5 py-3 text-xs font-semibold text-slate-600">
+        <a class="shrink-0 text-indigo-700" href="#top">Tapoda Next</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#facts">Evidence</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#lifecycle">Lifecycle</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#coverage">Features</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#experience">UX</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#form-engine">Forms</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#weaknesses">Weaknesses</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#page-ledger">Pages</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#flow-ledger">Flows</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#module-map">Modules</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#design-system">CI system</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#candidates">Deepening</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#architecture">Architecture</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#schema">Schema</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#integrations">External</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#migration">Migration</a>
+        <a class="shrink-0 hover:text-indigo-700" href="#verdict">Verdict</a>
+      </div>
+    </nav>
+
+    <main id="top" class="mx-auto max-w-7xl space-y-24 px-5 py-12 sm:px-8 lg:px-12">
+      <header class="grid items-end gap-10 lg:grid-cols-[1.25fr_.75fr]">
+        <div>
+          <p class="eyebrow mb-5 text-xs font-bold text-indigo-700">Product blueprint · 28 July 2026</p>
+          <h1 class="max-w-4xl font-serif text-5xl font-semibold leading-[1.03] tracking-tight text-slate-950 sm:text-7xl">
+            Tapoda, rebuilt around the course lifecycle.
+          </h1>
+          <p class="mt-6 max-w-3xl text-lg leading-8 text-slate-600">
+            One gated implementation direction. Repository feature coverage mapped; production parity
+            requires G0–G9. Explicit state, versioned forms, scoped access, observable communications.
+          </p>
+          <div class="mt-8 flex flex-wrap gap-2 text-xs font-semibold">
+            <span class="rounded-full bg-emerald-100 px-3 py-1.5 text-emerald-800">Preferred · Laravel modular monolith</span>
+            <span class="rounded-full bg-indigo-100 px-3 py-1.5 text-indigo-800">Thai-first · target WCAG 2.2 AA</span>
+            <span class="rounded-full bg-amber-100 px-3 py-1.5 text-amber-900">Implementation · gated</span>
+            <span class="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">Network required for CDN render</span>
+          </div>
+        </div>
+        <aside class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p class="eyebrow text-xs font-bold text-slate-500">Diagram legend</p>
+          <div class="mt-5 grid gap-3 text-sm">
+            <div class="flex items-center gap-3"><span class="h-8 w-12 rounded border-2 border-slate-500 bg-white"></span><span>solid box = module</span></div>
+            <div class="flex items-center gap-3"><span class="h-0 w-12 border-t-2 border-dashed border-slate-500"></span><span>dashed line = seam</span></div>
+            <div class="flex items-center gap-3"><span class="h-0 w-12 border-t-2 border-red-600"></span><span>red line = leakage</span></div>
+            <div class="flex items-center gap-3"><span class="deep h-8 w-12 rounded border-2 border-slate-950"></span><span>dark box = deep module</span></div>
+          </div>
+        </aside>
+      </header>
+
+      <section id="facts" class="space-y-8">
+        <div class="flex items-end justify-between gap-6">
+          <div>
+            <p class="eyebrow text-xs font-bold text-indigo-700">Repository evidence</p>
+            <h2 class="mt-2 font-serif text-4xl font-semibold">Large behavior surface. Thin safety net.</h2>
+          </div>
+          <p class="hidden text-right text-xs text-slate-500 md:block">Branch uat-20260526<br />SHA 3d2c3a4</p>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="metric text-3xl font-bold">109</p><p class="mt-1 text-xs text-slate-500">source routes · runtime conditional</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="metric text-3xl font-bold">22</p><p class="mt-1 text-xs text-slate-500">controllers</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="metric text-3xl font-bold">21</p><p class="mt-1 text-xs text-slate-500">models</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="metric text-3xl font-bold">91</p><p class="mt-1 text-xs text-slate-500">Blade views · 1 README</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="metric text-3xl font-bold">21</p><p class="mt-1 text-xs text-slate-500">SQL files · 19 changes + 2 references</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="metric text-3xl font-bold">12</p><p class="mt-1 text-xs text-slate-500">public PDFs</p></div>
+        </div>
+        <div class="grid gap-6 lg:grid-cols-2">
+          <div class="rounded-2xl border border-slate-200 bg-white p-7">
+            <h3 class="font-semibold">Current implementation</h3>
+            <ul class="mt-5 grid gap-3 text-sm text-slate-600">
+              <li class="flex justify-between gap-4 border-b border-slate-100 pb-3"><span>ApplyController</span><b class="text-slate-900">~80 KB</b></li>
+              <li class="flex justify-between gap-4 border-b border-slate-100 pb-3"><span>BackendReportController</span><b class="text-slate-900">~60 KB</b></li>
+              <li class="flex justify-between gap-4 border-b border-slate-100 pb-3"><span>BackendApproveController</span><b class="text-slate-900">~52 KB</b></li>
+              <li class="flex justify-between gap-4"><span>BackendExportController</span><b class="text-slate-900">~44 KB</b></li>
+            </ul>
+          </div>
+          <div class="rounded-2xl border border-red-200 bg-red-50 p-7">
+            <p class="eyebrow text-xs font-bold text-red-700">Source-truth warning</p>
+            <h3 class="mt-2 text-xl font-semibold">Repository migrations cannot recreate production.</h3>
+            <p class="mt-3 text-sm leading-6 text-red-900/75">
+              Manual SQL fixes rely on fixed numeric question and choice IDs. Live DDL, data profiling,
+              active links, report outputs, and the external target schema are mandatory before migration.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="lifecycle" class="space-y-8">
+        <div>
+          <p class="eyebrow text-xs font-bold text-indigo-700">Shared mental model</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">Proposed lifecycle. G2 approval required.</h2>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-6">
+          <pre class="mermaid" role="img" aria-label="Proposed application lifecycle from draft through completion, with rejection, declined invitation, cancellation, withdrawal, and no-show side states">
+flowchart LR
+  D[Draft<br/>ร่าง] --> S[Submitted<br/>ส่งใบสมัคร]
+  S --> R[Under review<br/>อยู่ระหว่างพิจารณา]
+  R --> I[Invited<br/>ได้รับเชิญ]
+  I --> C[Confirmed<br/>ยืนยันเข้าร่วม]
+  C --> K[Checked in<br/>ลงทะเบียนหน้างาน]
+  K --> F[Completed<br/>จบหลักสูตร]
+  R --> X[Rejected<br/>ไม่ผ่านการคัดเลือก]
+  I --> Q[Declined invitation<br/>ปฏิเสธคำเชิญ]
+  I --> Y[Cancelled before confirmation]
+  C --> Z[Withdrawn after confirmation]
+  C --> N[No-show]
+  classDef good fill:#ecfdf5,stroke:#059669,color:#064e3b;
+  classDef side fill:#fff7ed,stroke:#ea580c,color:#7c2d12;
+  class D,S,R,I,C,K,F good;
+  class X,Q,Y,Z,N side;
+          </pre>
+        </div>
+        <div class="grid gap-4 md:grid-cols-3">
+          <div class="rounded-xl border-l-4 border-indigo-600 bg-white p-5 shadow-sm">
+            <p class="text-xs font-bold uppercase text-indigo-700">Rule 01</p>
+            <p class="mt-2 text-sm">Only <code>ApplicationWorkflow</code> changes lifecycle state.</p>
+          </div>
+          <div class="rounded-xl border-l-4 border-indigo-600 bg-white p-5 shadow-sm">
+            <p class="text-xs font-bold uppercase text-indigo-700">Rule 02</p>
+            <p class="mt-2 text-sm">Review outcome is immutable and separate from state.</p>
+          </div>
+          <div class="rounded-xl border-l-4 border-indigo-600 bg-white p-5 shadow-sm">
+            <p class="text-xs font-bold uppercase text-indigo-700">Rule 03</p>
+            <p class="mt-2 text-sm">Every transition writes actor, reason, source, time, and outbox event.</p>
+          </div>
+        </div>
+        <div class="rounded-2xl border border-amber-300 bg-amber-50 p-6">
+          <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p class="eyebrow text-xs font-bold text-amber-800">Legacy ambiguity</p>
+              <p class="mt-1 font-semibold">13 observed state values collapse only through approved record-level rules.</p>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs">
+              <span class="rounded bg-white px-2 py-1">applying → draft</span>
+              <span class="rounded bg-white px-2 py-1">approved → invited</span>
+              <span class="rounded bg-white px-2 py-1">accepted → unresolved</span>
+              <span class="rounded bg-white px-2 py-1">rejected → actor evidence</span>
+              <span class="rounded bg-white px-2 py-1">canceled → evidence-based</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="coverage" class="space-y-8">
+        <div>
+          <p class="eyebrow text-xs font-bold text-indigo-700">Verified feature coverage</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">Nothing disappears behind “modernize”.</h2>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="text-2xl">◌</p><h3 class="mt-4 font-semibold">Public discovery</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Catalog, detail, year/month/type/center filters, eligibility, windows, attachments, map, qualifications, about, location masters.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="text-2xl">◎</p><h3 class="mt-4 font-semibold">Identity &amp; account</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Registration, email verification, login, safe recovery, profile, history, password, passport behavior, hash migration.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="text-2xl">◇</p><h3 class="mt-4 font-semibold">Four guided variants</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Initial/post-invitation × new/alumni, plus staff applicant, monastic, gender/category, D10M manager, part-time, travel, facilities, consent.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="text-2xl">↻</p><h3 class="mt-4 font-semibold">Applicant actions</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Autosave, resume, submit, timeline, accept/decline invitation, post-invitation tasks, confirm, cancel, withdraw, immutable receipt.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="text-2xl">▦</p><h3 class="mt-4 font-semibold">Course operations</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Policy, category opening, applicant counts, bulk actions, staff conversion, confirmation requests, cancellation, no-show, completion.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="text-2xl">✓</p><h3 class="mt-4 font-semibold">Review &amp; selection</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Group filters, prior applications, answers, training, part-time, aging, notes, decision, reason, conflict visibility.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="text-2xl">⌁</p><h3 class="mt-4 font-semibold">Check-in</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Course access, ID/passport lookup, card/manual verification, name policy, dinner, seating, facilities, arrival events.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="text-2xl">▤</p><h3 class="mt-4 font-semibold">Reports &amp; exports</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Eight applicant groups/sheets, five teacher groups, max-ten print, laundry room/day/cost totals, sticky identity, health/history/attendance.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="text-2xl">✉</p><h3 class="mt-4 font-semibold">Communications</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Welcome, recovery, invitation, request-confirm, confirmation, cancellation, audience rules, PDFs, maps, preview, retry.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="text-2xl">□</p><h3 class="mt-4 font-semibold">Documents</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Twelve observed PDFs, course attachments, privacy and practice versions, checksums, visibility, retention, compatible URLs.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="text-2xl">⌘</p><h3 class="mt-4 font-semibold">Access &amp; audit</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Admin account lifecycle, last-admin protection, scoped RBAC, sensitive-field permissions, support expiry, audit, exports, integration health.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-900 bg-slate-900 p-6 text-white">
+            <p class="text-2xl">!</p><h3 class="mt-4 font-semibold">Retirement ledger</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-300">Legacy routes, parole, Dhamma-language data, max-ten print, public tokens, placeholders, PDFs and emails need owner plus usage proof.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="experience" class="space-y-10">
+        <div>
+          <p class="eyebrow text-xs font-bold text-indigo-700">Future experience</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">Applicant clarity. Operational locality.</h2>
+        </div>
+        <div class="grid items-start gap-12 lg:grid-cols-[320px_1fr]">
+          <div class="mx-auto">
+            <p class="mb-4 text-center text-xs font-bold uppercase tracking-wider text-slate-500">Applicant · mobile</p>
+            <div class="phone bg-stone-50 p-4" lang="th">
+              <div class="mx-auto mb-5 h-1.5 w-16 rounded-full bg-slate-800"></div>
+              <div class="flex items-center justify-between text-xs"><b>ธัมมะตโปทา</b><span>TH⌄</span></div>
+              <p class="mt-8 text-xs text-slate-500">ใบสมัครปัจจุบัน</p>
+              <h3 class="mt-1 text-xl font-bold">หลักสูตรปฏิบัติธรรม 10 วัน</h3>
+              <div class="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3">
+                <p class="text-xs font-bold uppercase text-amber-800">งานถัดไป</p>
+                <p class="mt-1 text-sm font-semibold">กรอกข้อมูลการเดินทาง</p>
+                <p class="mt-1 text-xs text-slate-500">ครบกำหนด 12 ส.ค. 2569</p>
+              </div>
+              <div class="mt-5 space-y-0">
+                <div class="flex gap-3"><div class="flex flex-col items-center"><span class="h-4 w-4 rounded-full bg-emerald-500"></span><span class="h-10 w-px bg-emerald-300"></span></div><div><p class="text-xs font-semibold">ส่งใบสมัครแล้ว</p><p class="text-xs text-slate-500">28 ก.ค. 2569</p></div></div>
+                <div class="flex gap-3"><div class="flex flex-col items-center"><span class="h-4 w-4 rounded-full bg-emerald-500"></span><span class="h-10 w-px bg-emerald-300"></span></div><div><p class="text-xs font-semibold">ได้รับเชิญ</p><p class="text-xs text-slate-500">2 ส.ค. 2569</p></div></div>
+                <div class="flex gap-3"><div class="flex flex-col items-center"><span class="h-4 w-4 rounded-full border-4 border-indigo-600 bg-white"></span><span class="h-10 w-px bg-slate-200"></span></div><div><p class="text-xs font-semibold text-indigo-700">ยืนยันเข้าร่วม</p><p class="text-xs text-slate-500">กำลังดำเนินการ</p></div></div>
+                <div class="flex gap-3 text-slate-600"><span class="h-4 w-4 rounded-full border border-slate-600 bg-white"></span><p class="text-xs">ลงทะเบียนหน้างาน · ขั้นตอนถัดไป</p></div>
+              </div>
+              <div class="mt-6 w-full rounded-lg bg-indigo-700 px-4 py-3 text-center text-sm font-bold text-white">ดำเนินการต่อ</div>
+              <p class="mt-3 text-center text-xs text-slate-500">บันทึกล่าสุด 19:01 น.</p>
+            </div>
+            <p class="mt-5 text-center text-xs leading-5 text-slate-500">Applicant desktop uses the same timeline and task card in a centered readable column.</p>
+          </div>
+
+          <div>
+            <p class="mb-4 text-center text-xs font-bold uppercase tracking-wider text-slate-500">Course Workspace · desktop</p>
+            <div class="browser-frame hidden bg-white lg:block" lang="th">
+              <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-100 px-4 py-3"><span class="h-2.5 w-2.5 rounded-full bg-red-400"></span><span class="h-2.5 w-2.5 rounded-full bg-amber-400"></span><span class="h-2.5 w-2.5 rounded-full bg-emerald-400"></span><div class="ml-4 h-6 flex-1 rounded bg-white"></div></div>
+              <div class="grid min-h-[480px] grid-cols-[165px_1fr]">
+                <aside class="bg-slate-950 p-4 text-xs text-slate-300">
+                  <b class="text-sm text-white">Tapoda</b>
+                  <p class="mt-6 text-xs font-bold uppercase tracking-widest text-slate-300">หลักสูตร</p>
+                  <div class="mt-2 rounded bg-slate-800 p-2 text-white">รุ่น 10 วัน · ส.ค. 69</div>
+                  <div class="mt-5 space-y-3">
+                    <p class="text-white">ภาพรวม</p><p>ใบสมัคร <span class="float-right rounded bg-indigo-600 px-1.5">42</span></p><p>การพิจารณา</p><p>คำเชิญ</p><p>ผู้เข้าร่วม</p><p>เช็กอิน</p><p>งานปฏิบัติการ</p><p>การสื่อสาร</p><p>รายงาน</p><p>เอกสาร</p><p>บันทึกตรวจสอบ</p>
+                  </div>
+                </aside>
+                <div class="p-5">
+                  <div class="flex items-start justify-between gap-4"><div><p class="text-xs text-slate-500">ศูนย์ธัมมะตโปทา</p><h3 class="text-lg font-bold">หลักสูตรปฏิบัติธรรม 10 วัน</h3><p class="text-xs text-slate-500">18–27 สิงหาคม 2569</p></div><div class="rounded bg-indigo-700 px-3 py-2 text-xs font-bold text-white">+ เพิ่มงาน</div></div>
+                  <div class="mt-5 grid grid-cols-4 gap-2">
+                    <div class="rounded border border-slate-200 p-3"><p class="text-xs text-slate-500">ส่งแล้ว</p><b class="text-xl">42</b></div>
+                    <div class="rounded border border-slate-200 p-3"><p class="text-xs text-slate-500">รอพิจารณา</p><b class="text-xl">18</b></div>
+                    <div class="rounded border border-slate-200 p-3"><p class="text-xs text-slate-500">เชิญแล้ว</p><b class="text-xl">16</b></div>
+                    <div class="rounded border border-slate-200 p-3"><p class="text-xs text-slate-500">ยืนยันแล้ว</p><b class="text-xl">12</b></div>
+                  </div>
+                  <div class="mt-5 rounded border border-slate-200">
+                    <div class="flex items-center justify-between border-b border-slate-200 px-3 py-2"><b class="text-xs">งานที่ต้องดำเนินการ</b><span class="text-xs text-indigo-700">ดูคิวทั้งหมด →</span></div>
+                    <div class="grid grid-cols-[1.5fr_.7fr_.6fr] gap-2 border-b border-slate-100 px-3 py-2 text-xs font-bold text-slate-500"><span>งาน</span><span>อายุงาน</span><span>สถานะ</span></div>
+                    <div class="grid grid-cols-[1.5fr_.7fr_.6fr] gap-2 border-b border-slate-100 px-3 py-3 text-xs"><span>ใบสมัครรอมอบหมายผู้พิจารณา</span><span>2 วัน</span><span class="text-amber-700">18 รายการ</span></div>
+                    <div class="grid grid-cols-[1.5fr_.7fr_.6fr] gap-2 border-b border-slate-100 px-3 py-3 text-xs"><span>คำเชิญส่งไม่สำเร็จ</span><span>4 ชั่วโมง</span><span class="text-red-700">2 รายการ</span></div>
+                    <div class="grid grid-cols-[1.5fr_.7fr_.6fr] gap-2 px-3 py-3 text-xs"><span>ผู้สมัครเกิน 15 วันยังไม่ยืนยัน</span><span>16 วัน</span><span class="text-amber-700">3 รายการ</span></div>
+                  </div>
+                  <div class="mt-4 grid grid-cols-2 gap-3">
+                    <div class="rounded border border-slate-200 p-3"><p class="text-xs font-bold uppercase text-slate-500">Integration health</p><p class="mt-2 status-dot text-xs text-emerald-700">Postmark normal</p><p class="mt-1 status-dot text-xs text-emerald-700">Queue lag 3 sec</p></div>
+                    <div class="rounded border border-amber-200 bg-amber-50 p-3"><p class="text-xs font-bold uppercase text-amber-700">Policy attention</p><p class="mt-2 text-xs">ที่นั่งกลุ่มสตรีเหลือ 4</p><p class="mt-1 text-xs">เอกสารยินยอมใหม่รอเผยแพร่</p></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 lg:hidden" lang="th">
+              <p class="text-xs font-bold uppercase text-slate-500">Course Workspace · mobile cards</p>
+              <h3 class="mt-2 font-bold">หลักสูตรปฏิบัติธรรม 10 วัน</h3>
+              <div class="mt-4 grid grid-cols-2 gap-2 text-xs"><div class="rounded bg-slate-100 p-3">รอพิจารณา <b class="float-right">18</b></div><div class="rounded bg-slate-100 p-3">ยืนยันแล้ว <b class="float-right">12</b></div></div>
+              <div class="mt-3 rounded border border-red-200 bg-red-50 p-3 text-xs">คำเชิญส่งไม่สำเร็จ <b class="float-right text-red-700">2</b></div>
+              <div class="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-xs">เกิน 15 วันยังไม่ยืนยัน <b class="float-right text-amber-700">3</b></div>
+              <p class="mt-4 text-xs text-slate-500">Mobile cards preserve the same actions and authorized fields as the desktop grid.</p>
+            </div>
+          </div>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-6">
+          <p class="eyebrow text-xs font-bold text-slate-500">Information architecture</p>
+          <div class="mt-5 overflow-x-auto">
+            <div class="min-w-[800px]">
+              <pre class="mermaid" role="img" aria-label="Separate public, applicant, course workspace, cross-course queue, and platform administration information areas">
+flowchart TB
+  PUB[Public<br/>Home · Catalog · Detail · Eligibility · Documents]
+  APP[Applicant<br/>Account · Timeline · Tasks · Forms · History]
+  OPS[Course Workspace<br/>Overview · Applications · Review · Invitations · Participants · Check-in · Operations · Communications · Reports · Documents · Audit]
+  QUE[Cross-course queues<br/>Review · Delivery · Confirmation · Export · Migration · Integration]
+  ADM[Platform administration<br/>Access · Reference data · Form versions · Consent · Integrations · Retention]
+  PUB --> APP
+  APP -- submitted application enters workflow --> OPS
+  QUE --> OPS
+  ADM -.governs.-> APP
+  ADM -.governs.-> OPS
+              </pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="form-engine" class="space-y-10">
+        <div class="grid items-end gap-6 lg:grid-cols-[1fr_auto]">
+          <div>
+            <p class="eyebrow text-xs font-bold text-indigo-700">FormEngine · rendered question sections</p>
+            <h2 class="mt-2 max-w-4xl font-serif text-4xl font-semibold">One schema. One renderer. Every persona.</h2>
+            <p class="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
+              Actual Tapoda question wording, rendered against semantic keys. Values below are empty preview states,
+              not applicant data.
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2 text-xs font-bold">
+            <span class="rounded-full bg-indigo-100 px-3 py-1.5 text-indigo-800">semantic keys</span>
+            <span class="rounded-full bg-emerald-100 px-3 py-1.5 text-emerald-800">immutable version</span>
+            <span class="rounded-full bg-amber-100 px-3 py-1.5 text-amber-900">server authoritative</span>
+          </div>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div class="rounded-xl border border-red-200 bg-red-50 p-5"><p class="metric text-3xl font-bold text-red-800">7+</p><p class="mt-1 text-xs text-red-900">overlapping question loaders</p></div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-5"><p class="metric text-3xl font-bold text-red-800">4</p><p class="mt-1 text-xs text-red-900">duplicated Blade renderers</p></div>
+          <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-5"><p class="metric text-3xl font-bold text-emerald-800">1</p><p class="mt-1 text-xs text-emerald-900">target QuestionSection implementation</p></div>
+        </div>
+
+        <div class="browser-frame bg-white">
+          <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-100 px-4 py-3">
+            <span class="h-2.5 w-2.5 rounded-full bg-red-400"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+            <div class="ml-4 h-6 flex-1 rounded bg-white"></div>
+          </div>
+          <div class="grid lg:grid-cols-[230px_1fr]">
+            <aside class="border-b border-slate-200 bg-slate-950 p-5 text-sm text-slate-300 lg:border-b-0 lg:border-r">
+              <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Initial application</p>
+              <ol class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-1">
+                <li class="flex items-center gap-3 text-slate-400"><span class="grid h-6 w-6 place-items-center rounded-full bg-emerald-500 text-xs font-bold text-white">✓</span><span>ข้อมูลส่วนตัว</span></li>
+                <li class="flex items-center gap-3 text-white"><span class="grid h-6 w-6 place-items-center rounded-full bg-indigo-500 text-xs font-bold">2</span><span>ข้อมูลผู้สมัคร</span></li>
+                <li class="flex items-center gap-3"><span class="grid h-6 w-6 place-items-center rounded-full border border-slate-500 text-xs">3</span><span>ข้อมูลสุขภาพ</span></li>
+                <li class="flex items-center gap-3"><span class="grid h-6 w-6 place-items-center rounded-full border border-slate-500 text-xs">4</span><span>ยินยอมข้อมูล</span></li>
+              </ol>
+              <div class="mt-6 rounded-lg bg-white/10 p-3 text-xs leading-5">
+                <p class="font-bold text-white">Variant</p>
+                <p class="mt-1">new · trainee · lay · female</p>
+                <p>form v2026.08</p>
+              </div>
+            </aside>
+
+            <div class="p-5 sm:p-8" lang="th">
+              <div class="flex flex-col gap-3 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p class="text-xs font-bold uppercase tracking-wider text-indigo-700">ส่วนที่ 3 จาก 4</p>
+                  <h3 class="mt-1 text-2xl font-bold">ข้อมูลสุขภาพและการดูแล</h3>
+                  <p class="mt-2 text-sm text-slate-600">ข้อมูลนี้ใช้เพื่อประเมินความพร้อมและจัดการดูแลระหว่างการอบรม</p>
+                </div>
+                <p class="shrink-0 text-xs text-emerald-700">● บันทึกร่างแล้ว · revision 12</p>
+              </div>
+
+              <fieldset class="mt-7 space-y-7" aria-describedby="form-preview-note">
+                <legend class="sr-only">ตัวอย่างคำถามข้อมูลสุขภาพ</legend>
+
+                <div class="space-y-3">
+                  <div class="flex flex-wrap items-start justify-between gap-2">
+                    <label class="max-w-3xl text-sm font-semibold" for="demo-health-yes">
+                      ที่ผ่านมาหรือปัจจุบัน ท่านมีปัญหาด้านสุขภาพ คือ การเจ็บป่วยทางร่างกายหรือโรคติดต่อหรือไม่
+                      <span class="text-red-700" aria-label="required">*</span>
+                    </label>
+                    <code class="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">health.has_physical_condition</code>
+                  </div>
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    <label class="flex min-h-12 items-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm"><input id="demo-health-no" type="radio" name="demo-health" disabled /> ไม่มี</label>
+                    <label class="flex min-h-12 items-center gap-3 rounded-lg border-2 border-indigo-600 bg-indigo-50 px-4 py-3 text-sm font-semibold"><input id="demo-health-yes" type="radio" name="demo-health" checked disabled /> มี</label>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border-l-4 border-indigo-500 bg-indigo-50/70 p-5">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <label class="text-sm font-semibold" for="demo-health-details">ถ้าเคย โปรดให้รายละเอียด</label>
+                    <span class="rounded-full bg-indigo-100 px-2 py-1 text-xs text-indigo-800">แสดงเมื่อคำตอบ = มี</span>
+                  </div>
+                  <p class="mt-1 text-xs text-slate-600">โรคหรืออาการ · วันที่เริ่ม · ระยะเวลา · การรักษา · สถานะปัจจุบัน</p>
+                  <textarea id="demo-health-details" class="mt-3 min-h-24 w-full rounded-lg border border-slate-300 bg-white p-3 text-sm" placeholder="โปรดให้รายละเอียด" disabled></textarea>
+                  <p class="mt-2 text-xs text-slate-500"><code>health.physical_condition_details</code> · hidden policy: clear</p>
+                </div>
+
+                <div class="space-y-3 border-t border-slate-200 pt-7">
+                  <div class="flex flex-wrap items-start justify-between gap-2">
+                    <label class="max-w-3xl text-sm font-semibold" for="demo-substance-ever">
+                      ในช่วง 2 ปีที่ผ่านมา ท่านเคยเสพสิ่งเสพติดใดๆ มาก่อนหรือไม่
+                      <span class="text-red-700" aria-label="required">*</span>
+                    </label>
+                    <code class="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">health.has_recent_substance_use</code>
+                  </div>
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    <label class="flex min-h-12 items-center gap-3 rounded-lg border border-slate-300 px-4 py-3 text-sm"><input type="radio" name="demo-substance" disabled /> ไม่เคย</label>
+                    <label class="flex min-h-12 items-center gap-3 rounded-lg border-2 border-indigo-600 bg-indigo-50 px-4 py-3 text-sm font-semibold"><input id="demo-substance-ever" type="radio" name="demo-substance" checked disabled /> เคย</label>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border-l-4 border-indigo-500 bg-indigo-50/70 p-5">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div><p class="text-sm font-semibold">รายละเอียดการเสพในอดีต</p><p class="mt-1 text-xs text-slate-600">กรอกเฉพาะรายการที่เกี่ยวข้อง</p></div>
+                    <code class="rounded bg-white px-2 py-1 text-xs text-slate-600">health.substance_use_history</code>
+                  </div>
+                  <div class="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                    <table class="min-w-[620px] w-full text-left text-xs">
+                      <caption class="sr-only">Repeatable substance-use detail fields</caption>
+                      <thead class="bg-slate-100 text-slate-700"><tr><th id="substance-col-row" scope="col" class="p-3">รายการ</th><th id="substance-col-name" scope="col" class="p-3">ชื่อสิ่งเสพติด</th><th id="substance-col-duration" scope="col" class="p-3">ระยะเวลาในอดีต</th><th id="substance-col-frequency" scope="col" class="p-3">ความถี่</th></tr></thead>
+                      <tbody class="divide-y divide-slate-100">
+                        <tr><th id="substance-row-1" scope="row" class="p-2 text-left font-medium text-slate-500">แถว 1</th><td class="p-2"><input aria-labelledby="substance-row-1 substance-col-name" class="w-full rounded border border-slate-300 p-2" placeholder="ระบุชื่อ" disabled /></td><td class="p-2"><input aria-labelledby="substance-row-1 substance-col-duration" class="w-full rounded border border-slate-300 p-2" placeholder="เช่น 2 ปี" disabled /></td><td class="p-2"><input aria-labelledby="substance-row-1 substance-col-frequency" class="w-full rounded border border-slate-300 p-2" placeholder="ระบุความถี่" disabled /></td></tr>
+                        <tr><th id="substance-row-2" scope="row" class="p-2 text-left font-medium text-slate-500">แถว 2</th><td class="p-2"><input aria-labelledby="substance-row-2 substance-col-name" class="w-full rounded border border-slate-300 p-2" placeholder="ระบุชื่อ" disabled /></td><td class="p-2"><input aria-labelledby="substance-row-2 substance-col-duration" class="w-full rounded border border-slate-300 p-2" placeholder="ระยะเวลา" disabled /></td><td class="p-2"><input aria-labelledby="substance-row-2 substance-col-frequency" class="w-full rounded border border-slate-300 p-2" placeholder="ความถี่" disabled /></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p class="mt-3 text-xs font-semibold text-indigo-700">＋ เพิ่มรายการ · 0–10 แถว · ตรวจสอบข้อผิดพลาดรายแถว</p>
+                </div>
+
+                <div class="rounded-lg bg-slate-100 p-4 text-xs text-slate-600" id="form-preview-note">
+                  Preview only. Server re-evaluates visibility and validation. Hidden sensitive answers clear by published policy.
+                </div>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid gap-6 xl:grid-cols-[.85fr_1.15fr]">
+          <article class="rounded-2xl border border-slate-200 bg-white p-6" lang="th">
+            <div class="flex items-start justify-between gap-3">
+              <div><p class="eyebrow text-xs font-bold text-indigo-700">Operations section</p><h3 class="mt-2 text-xl font-bold">ข้อมูลอื่นๆ สำหรับฝ่ายจัดการ</h3></div>
+              <span class="rounded-full bg-slate-100 px-3 py-1 text-xs">group 13 → semantic schema</span>
+            </div>
+            <fieldset class="mt-6 space-y-5">
+              <legend class="sr-only">ตัวอย่างคำถามฝ่ายจัดการ</legend>
+              <div><label class="text-sm font-semibold" for="demo-travel">การเดินทาง</label><select id="demo-travel" class="mt-2 w-full rounded-lg border border-slate-300 bg-white p-3 text-sm" disabled><option>เดินทางกับรถศูนย์ทั้งไปและกลับ</option></select><code class="mt-2 block text-xs text-slate-500">operations.travel_method</code></div>
+              <div class="border-t border-slate-200 pt-5"><p class="text-sm font-semibold">จำเป็นต้องรับประทานอาหารเย็นหรือไม่</p><div class="mt-2 flex gap-2"><span class="rounded-lg border-2 border-indigo-600 bg-indigo-50 px-4 py-2 text-sm font-semibold">มี</span><span class="rounded-lg border border-slate-300 px-4 py-2 text-sm">ไม่มี</span></div><div class="mt-3 rounded-lg border-l-4 border-indigo-500 bg-indigo-50 p-4"><label class="text-xs font-semibold" for="demo-dinner">ระบุรายละเอียด</label><textarea id="demo-dinner" class="mt-2 min-h-16 w-full rounded border border-slate-300 bg-white p-2" disabled></textarea></div></div>
+              <div class="border-t border-slate-200 pt-5"><p class="text-sm font-semibold">สามารถนั่งอาสนะบนพื้นได้หรือไม่</p><div class="mt-2 flex gap-2"><span class="rounded-lg border border-slate-300 px-4 py-2 text-sm">ได้</span><span class="rounded-lg border-2 border-indigo-600 bg-indigo-50 px-4 py-2 text-sm font-semibold">ไม่ได้</span></div><div class="mt-3 rounded-lg border-l-4 border-indigo-500 bg-indigo-50 p-4"><label class="text-xs font-semibold" for="demo-seat">ระบุเหตุผล</label><textarea id="demo-seat" class="mt-2 min-h-16 w-full rounded border border-slate-300 bg-white p-2" disabled></textarea></div></div>
+            </fieldset>
+          </article>
+
+          <article class="browser-frame bg-white">
+            <div class="border-b border-slate-200 bg-slate-950 px-5 py-4 text-white">
+              <div class="flex flex-wrap items-center justify-between gap-3"><div><p class="text-xs font-bold uppercase tracking-wider text-indigo-300">Form Studio</p><h3 class="mt-1 text-xl font-bold">Initial application · draft v2026.09</h3></div><span class="rounded-full bg-amber-400/20 px-3 py-1 text-xs font-bold text-amber-200">7 publish checks pending</span></div>
+            </div>
+            <div class="grid md:grid-cols-[180px_1fr]">
+              <aside class="border-b border-slate-200 bg-slate-50 p-4 text-xs md:border-b-0 md:border-r">
+                <p class="font-bold uppercase text-slate-500">Sections</p>
+                <div class="mt-3 space-y-2"><div class="rounded p-2">1 · Profile</div><div class="rounded bg-indigo-100 p-2 font-bold text-indigo-800">2 · Health</div><div class="rounded p-2">3 · Preferences</div><div class="rounded p-2">4 · Consent</div></div>
+                <p class="mt-6 font-bold uppercase text-slate-500">Preview persona</p>
+                <div class="mt-2 flex flex-wrap gap-1"><span class="rounded bg-white px-2 py-1">new</span><span class="rounded bg-white px-2 py-1">trainee</span><span class="rounded bg-white px-2 py-1">female</span></div>
+              </aside>
+              <div class="p-5">
+                <div class="flex flex-wrap items-start justify-between gap-3"><div><p class="text-xs text-slate-500">Question definition</p><h4 class="mt-1 font-bold">Dinner requirement</h4></div><span class="rounded bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800">semantic key locked</span></div>
+                <dl class="mt-5 grid gap-4 text-xs sm:grid-cols-2">
+                  <div><dt class="font-bold text-slate-500">Key</dt><dd class="mt-1 rounded border border-slate-200 bg-slate-50 p-2 font-mono">operations.needs_dinner</dd></div>
+                  <div><dt class="font-bold text-slate-500">Type</dt><dd class="mt-1 rounded border border-slate-200 bg-slate-50 p-2">single_choice · cards</dd></div>
+                  <div><dt class="font-bold text-slate-500">Required</dt><dd class="mt-1 rounded border border-slate-200 bg-slate-50 p-2">always</dd></div>
+                  <div><dt class="font-bold text-slate-500">Legacy mapping</dt><dd class="mt-1 rounded border border-slate-200 bg-slate-50 p-2">group 13 · Q46</dd></div>
+                </dl>
+                <div class="mt-5"><p class="text-xs font-bold text-slate-500">Dependent rule</p><pre class="mt-2 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-200"><code>{
+  "question": "operations.needs_dinner",
+  "operator": "equals",
+  "value": "yes",
+  "shows": "operations.dinner_reason",
+  "hiddenAnswerPolicy": "clear"
+}</code></pre></div>
+                <div class="mt-5 grid gap-2 sm:grid-cols-2"><div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">✓ no dependency cycle</div><div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">✓ Thai label complete</div><div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">! report mapping review</div><div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">! second approver required</div></div>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-6">
+          <pre class="mermaid" role="img" aria-label="Form authoring and runtime flow from Form Studio through immutable published version to FormEngine, shared QuestionSection renderer, drafts, and submissions">
+flowchart LR
+  STUDIO[Form Studio<br/>draft · preview · checks] --> ADMIN[Form administration adapter]
+  ADMIN --> ENGINE[FormEngine]
+  ENGINE --> VERSION[(Immutable form version)]
+  VERSION --> ENGINE
+  CONTEXT[Authorized FormContext] --> ENGINE
+  ENGINE --> SCHEMA[FormSchema<br/>semantic keys · rules · initial values]
+  SCHEMA --> SECTION[QuestionSection]
+  SECTION --> REGISTRY[Field renderer registry]
+  SECTION --> WORKFLOW[Application Workflow]
+  WORKFLOW --> DRAFT[(Mutable draft answers<br/>revision + idempotency)]
+  WORKFLOW --> SUBMIT[(Immutable submission<br/>server validation + frozen answers)]
+  LEGACY[Legacy definition + answer adapters] -.migration seam.-> ENGINE
+  classDef deep fill:#0f172a,stroke:#020617,color:#fff;
+  class ENGINE,WORKFLOW deep;
+          </pre>
+        </div>
+
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div class="grid grid-cols-[1fr_1fr] bg-slate-950 p-4 text-xs font-bold text-white"><span>Current</span><span>Mature target</span></div>
+          <div class="grid grid-cols-[1fr_1fr] border-b border-slate-100 p-4 text-sm"><span><code>quest46</code> and group 13 leak into views</span><span><code>operations.needs_dinner</code> crosses the interface</span></div>
+          <div class="grid grid-cols-[1fr_1fr] border-b border-slate-100 p-4 text-sm"><span>Thai label length selects textarea</span><span>Published type and renderer hint select control</span></div>
+          <div class="grid grid-cols-[1fr_1fr] border-b border-slate-100 p-4 text-sm"><span>Triggers inferred from legacy choice spellings</span><span>Restricted declarative rules use canonical values</span></div>
+          <div class="grid grid-cols-[1fr_1fr] border-b border-slate-100 p-4 text-sm"><span>Four views repeat renderer, CSS, and JavaScript</span><span>One QuestionSection and field registry</span></div>
+          <div class="grid grid-cols-[1fr_1fr] p-4 text-sm"><span>Management save also confirms and emails</span><span>FormEngine freezes data; ApplicationWorkflow transitions</span></div>
+        </div>
+      </section>
+
+      <section id="weaknesses" class="space-y-10">
+        <div class="grid items-end gap-6 lg:grid-cols-[1fr_auto]">
+          <div>
+            <p class="eyebrow text-xs font-bold text-indigo-700">Behavior-preserving weakness remediation</p>
+            <h2 class="mt-2 max-w-4xl font-serif text-4xl font-semibold">Same current result. Complete history underneath.</h2>
+            <p class="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
+              Repository paths overwrite current status, invitation state, customer profile, and training summary.
+              The rebuild keeps fast current screens as projections while immutable source records preserve what happened.
+            </p>
+          </div>
+          <div class="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-xs leading-5 text-amber-950">
+            <b>Migration rule</b><br />
+            Never invent a reviewer, reason, score, note, or event absent from legacy evidence.
+          </div>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-xl border border-red-200 bg-red-50 p-5"><p class="font-mono text-sm font-bold text-red-900">apply_course.status</p><p class="mt-2 text-xs text-red-900">replaced by several paths</p></div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-5"><p class="font-mono text-sm font-bold text-red-900">invite_accept</p><p class="mt-2 text-xs text-red-900">one mutable outcome row</p></div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-5"><p class="font-mono text-sm font-bold text-red-900">contact</p><p class="mt-2 text-xs text-red-900">current profile reused by old reports</p></div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-5"><p class="font-mono text-sm font-bold text-red-900">training_history_info</p><p class="mt-2 text-xs text-red-900">one aggregate row per customer</p></div>
+        </div>
+
+        <div class="grid gap-6 xl:grid-cols-[.9fr_1.1fr]">
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="eyebrow text-xs font-bold text-red-700">Current · latest-only review</p>
+            <h3 class="mt-2 text-xl font-bold">One status replaces the explanation.</h3>
+            <div class="mt-6 rounded-xl border border-red-200 bg-red-50/40 p-5">
+              <div class="grid gap-3 text-xs sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+                <div class="rounded-lg border border-red-200 bg-white p-4">
+                  <p class="font-bold">Reviewer action</p>
+                  <p class="mt-2 text-slate-600">approved / rejected / canceled</p>
+                </div>
+                <span class="text-center text-lg text-red-600">→</span>
+                <div class="rounded-lg border border-red-300 bg-white p-4">
+                  <p class="font-mono font-bold">apply_course.status</p>
+                  <p class="mt-2 text-red-700">previous value replaced</p>
+                </div>
+              </div>
+              <div class="mx-auto h-7 w-px bg-red-300"></div>
+              <div class="rounded-lg border border-red-300 bg-white p-4 text-xs">
+                <p class="font-bold">Report reads latest joins</p>
+                <p class="mt-2 text-slate-600">current contact · current training aggregate · current question labels</p>
+              </div>
+            </div>
+            <ul class="mt-5 space-y-2 text-sm text-slate-600">
+              <li>× Cannot prove which submission was reviewed.</li>
+              <li>× Course A and Course B context is hard to compare.</li>
+              <li>× Later profile edits can change an old report.</li>
+              <li>× Missing legacy evidence cannot safely be reconstructed.</li>
+            </ul>
+          </article>
+
+          <article class="rounded-2xl border border-emerald-200 bg-emerald-50/30 p-6">
+            <p class="eyebrow text-xs font-bold text-emerald-700">Target · immutable history plus projection</p>
+            <h3 class="mt-2 text-xl font-bold">Every course retains its reviewed facts.</h3>
+            <div class="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+              <pre class="mermaid" role="img" aria-label="Target per-course review model with immutable submissions, review rounds, submitted reviews, decisions, status events, and current projections">
+flowchart LR
+  PERSON[Customer] --> APP1[Course A application]
+  PERSON --> APP2[Course B application]
+  APP1 --> SUB1[Submission v1]
+  APP2 --> SUB2[Submission v1]
+  SUB1 --> ROUND1[Review round 1]
+  SUB2 --> ROUND2[Review round 1]
+  ROUND1 --> REV1[Immutable reviews]
+  ROUND2 --> REV2[Immutable reviews]
+  REV1 --> DEC1[Decision]
+  REV2 --> DEC2[Decision]
+  DEC1 --> EVT1[Status events]
+  DEC2 --> EVT2[Status events]
+  EVT1 --> PROJ[Current projections]
+  EVT2 --> PROJ
+  PROJ --> UI[Existing list behavior]
+  classDef deep fill:#0f172a,stroke:#020617,color:#fff;
+  class ROUND1,ROUND2,PROJ deep;
+              </pre>
+            </div>
+            <p class="mt-4 text-xs leading-5 text-slate-600">
+              Current list screens still show one status. Drill-down reveals the course, submitted revision,
+              review round, contributing reviewers, allowed notes, reason, decision, and event timeline.
+            </p>
+          </article>
+        </div>
+
+        <article class="browser-frame bg-white">
+          <div class="border-b border-slate-200 bg-slate-950 px-5 py-4 text-white">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div><p class="text-xs font-bold uppercase tracking-wider text-indigo-300">Customer course history</p><h3 class="mt-1 text-xl font-bold">Review history by course</h3></div>
+              <span class="rounded-full bg-white/10 px-3 py-1 text-xs">anonymous product mock · no PII</span>
+            </div>
+          </div>
+          <div class="grid lg:grid-cols-[240px_1fr]">
+            <aside class="border-b border-slate-200 bg-slate-50 p-5 text-sm lg:border-b-0 lg:border-r">
+              <p class="text-xs font-bold uppercase text-slate-500">Summary</p>
+              <dl class="mt-4 space-y-3">
+                <div><dt class="text-xs text-slate-500">Applications</dt><dd class="font-bold">3 courses</dd></div>
+                <div><dt class="text-xs text-slate-500">Completed</dt><dd class="font-bold">1</dd></div>
+                <div><dt class="text-xs text-slate-500">Under review</dt><dd class="font-bold">1</dd></div>
+                <div><dt class="text-xs text-slate-500">Latest profile</dt><dd class="font-bold">Profile revision 7</dd></div>
+              </dl>
+              <p class="mt-6 rounded-lg bg-amber-100 p-3 text-xs leading-5 text-amber-950">Latest profile remains reusable. Each course keeps its submitted profile snapshot.</p>
+            </aside>
+            <div class="p-5 sm:p-7">
+              <div class="space-y-4">
+                <article class="rounded-xl border border-slate-200 p-5">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div><p class="text-xs text-slate-500">Course A · 2024 session</p><h4 class="mt-1 font-bold">Submission v1 · profile snapshot v3</h4></div>
+                    <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">completed</span>
+                  </div>
+                  <div class="mt-4 grid gap-3 text-xs sm:grid-cols-4">
+                    <div><p class="text-slate-500">Review round</p><b>1</b></div>
+                    <div><p class="text-slate-500">Submitted reviews</p><b>2</b></div>
+                    <div><p class="text-slate-500">Decision</p><b>invited</b></div>
+                    <div><p class="text-slate-500">Evidence</p><b class="text-indigo-700">Open reviewed snapshot</b></div>
+                  </div>
+                </article>
+                <article class="rounded-xl border border-slate-200 p-5">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div><p class="text-xs text-slate-500">Course B · 2025 session</p><h4 class="mt-1 font-bold">Submission v1 · profile snapshot v5</h4></div>
+                    <span class="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-700">rejected</span>
+                  </div>
+                  <div class="mt-4 grid gap-3 text-xs sm:grid-cols-4">
+                    <div><p class="text-slate-500">Review round</p><b>1</b></div>
+                    <div><p class="text-slate-500">Submitted reviews</p><b>1</b></div>
+                    <div><p class="text-slate-500">Reason</p><b>approved reason code</b></div>
+                    <div><p class="text-slate-500">Evidence</p><b class="text-indigo-700">Open reviewed snapshot</b></div>
+                  </div>
+                </article>
+                <article class="rounded-xl border-2 border-indigo-300 bg-indigo-50/30 p-5">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div><p class="text-xs text-slate-500">Course C · 2026 session</p><h4 class="mt-1 font-bold">Submission v2 · profile snapshot v7</h4></div>
+                    <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">under review</span>
+                  </div>
+                  <div class="mt-4 grid gap-3 text-xs sm:grid-cols-4">
+                    <div><p class="text-slate-500">Review round</p><b>2 · reconsideration</b></div>
+                    <div><p class="text-slate-500">Assignments</p><b>2 reviewers</b></div>
+                    <div><p class="text-slate-500">Prior decision</p><b>retained in timeline</b></div>
+                    <div><p class="text-slate-500">Current task</p><b class="text-indigo-700">1 review pending</b></div>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div class="overflow-x-auto">
+            <table class="min-w-[980px] w-full text-left text-xs">
+              <caption class="sr-only">Current weakness patterns and behavior-preserving replacements</caption>
+              <thead class="bg-slate-950 text-white"><tr><th scope="col" class="p-4">Current pattern</th><th scope="col" class="p-4">Observed weakness</th><th scope="col" class="p-4">Mature replacement</th><th scope="col" class="p-4">Parity proof</th></tr></thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr><td class="p-4 font-mono">apply_course.status</td><td class="p-4">latest transition only</td><td class="p-4">append-only status events + projection</td><td class="p-4">event replay equals legacy status</td></tr>
+                <tr><td class="p-4">approval + invite row update</td><td class="p-4">no exact reviewed revision or round</td><td class="p-4">review rounds, immutable reviews, decisions</td><td class="p-4">per-course outcome comparison</td></tr>
+                <tr><td class="p-4 font-mono">contact</td><td class="p-4">old report reads current profile</td><td class="p-4">submission profile snapshot</td><td class="p-4">later edit cannot change old report</td></tr>
+                <tr><td class="p-4 font-mono">training_history_info</td><td class="p-4">one mutable customer aggregate</td><td class="p-4">experiences + preserved summary + snapshot</td><td class="p-4">legacy display reconciles; no invented rows</td></tr>
+                <tr><td class="p-4 font-mono">question_apply_course</td><td class="p-4">answers and current labels drift</td><td class="p-4">immutable submission answer/label snapshot</td><td class="p-4">golden answer receipt</td></tr>
+                <tr><td class="p-4 font-mono">invite_accept</td><td class="p-4">outcome and delivery history collapse</td><td class="p-4">invitation, token, message, delivery records</td><td class="p-4">latest projection + failure scenarios</td></tr>
+                <tr><td class="p-4">direct report joins</td><td class="p-4">screen, print, XLSX drift</td><td class="p-4">versioned report specification</td><td class="p-4">golden output comparison</td></tr>
+                <tr><td class="p-4">binary admin checks</td><td class="p-4">course and sensitive scope too broad</td><td class="p-4">scoped role assignments + access events</td><td class="p-4">deny-by-default RBAC matrix</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-indigo-200 bg-indigo-50 p-6">
+          <p class="eyebrow text-xs font-bold text-indigo-700">Compatibility contract</p>
+          <div class="mt-4 grid gap-4 text-sm md:grid-cols-3">
+            <div><b>Write</b><p class="mt-1 text-slate-600">One owning module appends facts and updates projections in one transaction.</p></div>
+            <div><b>Read</b><p class="mt-1 text-slate-600">Existing screens initially consume legacy-shaped projections.</p></div>
+            <div><b>Cut over</b><p class="mt-1 text-slate-600">Zero unexplained status, review, snapshot, answer, and report differences.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-ledger" class="space-y-8">
+        <div class="grid gap-6 lg:grid-cols-[1fr_.45fr] lg:items-end">
+          <div>
+            <p class="eyebrow text-xs font-bold text-indigo-700">BA page ledger</p>
+            <h2 class="mt-2 font-serif text-4xl font-semibold">Every current page has a disposition path.</h2>
+            <p class="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
+              The canonical CSV holds all 109 concrete source route declarations with actor, handler, response, related views,
+              reads, writes, transitions, side effects, classification, confidence, and notes. Static files
+              remain evidence until production telemetry proves their use or retirement.
+            </p>
+          </div>
+          <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+            <p class="eyebrow text-xs font-bold text-emerald-700">Static reconciliation</p>
+            <p class="mt-2 text-3xl font-bold text-emerald-900">109 / 109</p>
+            <p class="mt-1 text-sm text-emerald-900/70">source route declarations logged; runtime conditional</p>
+          </div>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="metric text-3xl font-bold">48</p><p class="mt-1 text-xs text-slate-500">direct route pages</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="metric text-3xl font-bold">24</p><p class="mt-1 text-xs text-slate-500">layouts, partials, report helpers</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="metric text-3xl font-bold">13</p><p class="mt-1 text-xs text-slate-500">active email templates</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="metric text-3xl font-bold">6</p><p class="mt-1 text-xs text-slate-500">orphan or unknown Blade</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="metric text-3xl font-bold">22</p><p class="mt-1 text-xs text-slate-500">root HTML/PHP/PDF artifacts</p></div>
+        </div>
+
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div class="overflow-x-auto">
+            <table class="min-w-[1100px] w-full text-left text-xs">
+              <caption class="sr-only">Current page families, target patterns, owners, and migration gates</caption>
+              <thead class="bg-slate-950 text-white">
+                <tr><th scope="col" class="p-4">Current family</th><th scope="col" class="p-4">Current experience</th><th scope="col" class="p-4">Revised pattern</th><th scope="col" class="p-4">Single owner</th><th scope="col" class="p-4">Consulted interfaces</th><th scope="col" class="p-4">Gate</th></tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr><td class="p-4 font-semibold">Public course</td><td class="p-4">Catalog, filters, detail</td><td class="p-4">PublicShell + shareable filters</td><td class="p-4">Course Catalog &amp; Sessions</td><td class="p-4">Reference Data, Documents &amp; Consent, Design System</td><td class="p-4">Eligibility/link parity</td></tr>
+                <tr><td class="p-4 font-semibold">Registration</td><td class="p-4">Desktop/mobile templates, OTP, consent</td><td class="p-4">One responsive RegistrationFlow</td><td class="p-4">Identity &amp; Access</td><td class="p-4">People &amp; Profiles, Documents &amp; Consent, Design System</td><td class="p-4">OTP/replay/non-enumeration</td></tr>
+                <tr><td class="p-4 font-semibold">Application</td><td class="p-4">Four V2 variants</td><td class="p-4">ApplicationShell + FormSection</td><td class="p-4">Application Workflow</td><td class="p-4">Form Engine, People &amp; Profiles, Documents &amp; Consent, Design System</td><td class="p-4">All persona/condition fixtures</td></tr>
+                <tr><td class="p-4 font-semibold">Member</td><td class="p-4">One large multi-tab page</td><td class="p-4">MemberShell with owned panels</td><td class="p-4">People &amp; Profiles</td><td class="p-4">Application Workflow, Identity &amp; Access, Design System</td><td class="p-4">History/security/empty states</td></tr>
+                <tr><td class="p-4 font-semibold">Review</td><td class="p-4">Segmented queue, detail, latest status</td><td class="p-4">ReviewQueue + ApplicantReview</td><td class="p-4">Review &amp; Selection</td><td class="p-4">Application Workflow, People &amp; Profiles, Design System</td><td class="p-4">Per-course immutable history</td></tr>
+                <tr><td class="p-4 font-semibold">Course settings</td><td class="p-4">Registration and session settings</td><td class="p-4">CourseWorkspace settings</td><td class="p-4">Course Catalog &amp; Sessions</td><td class="p-4">Design System</td><td class="p-4">Policy/scope fixtures</td></tr>
+                <tr><td class="p-4 font-semibold">Bulk status</td><td class="p-4">Direct multi-person status write</td><td class="p-4">BulkActionPreview + results</td><td class="p-4">Application Workflow</td><td class="p-4">Course Catalog &amp; Sessions, Audit &amp; Compliance, Design System</td><td class="p-4">Allowed/denied/partial results</td></tr>
+                <tr><td class="p-4 font-semibold">Laundry/facilities</td><td class="p-4">Worksheet and divergent export</td><td class="p-4">Persisted OperationsGrid</td><td class="p-4">Operations &amp; Facilities</td><td class="p-4">Reports &amp; Exports, Design System</td><td class="p-4">Screen/export equality</td></tr>
+                <tr><td class="p-4 font-semibold">Reports</td><td class="p-4">Separate HTML, modal, print, XLSX queries</td><td class="p-4">Shared projection + output adapters</td><td class="p-4">Reports &amp; Exports</td><td class="p-4">Application Workflow, Review &amp; Selection, Design System</td><td class="p-4">Golden row/field reconciliation</td></tr>
+                <tr><td class="p-4 font-semibold">Legacy artifacts</td><td class="p-4">Old forms, static HTML/PHP</td><td class="p-4">Migrate, adapter, archive, or remove</td><td class="p-4">Legacy Compatibility</td><td class="p-4">Documents &amp; Consent, Platform Operations</td><td class="p-4">Telemetry, owner, retention, rollback</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="flow-ledger" class="space-y-8">
+        <div>
+          <p class="eyebrow text-xs font-bold text-indigo-700">Current-flow ledger</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">Log behavior first. Improve the experience second.</h2>
+          <p class="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
+            Twenty-nine stable flow IDs retain actors, entries, branch rules, reads, writes, lifecycle
+            effects, external effects, failure outcomes, target ownership, and parity proof.
+          </p>
+        </div>
+
+        <div class="paper-grid overflow-x-auto rounded-2xl border border-slate-200 bg-white p-5">
+          <pre class="mermaid" role="img" aria-label="Tapoda actor journeys mapped through current flow families into target modules">
+flowchart LR
+  V[Visitor] --> PUB["FLOW-PUB-01<br/>Discovery"]
+  V --> AUTH["FLOW-AUTH-01<br/>Registration"]
+  A[Applicant or alumni] --> APP["FLOW-APP-01..06<br/>Start, resume, submit"]
+  A --> INV["FLOW-INV-01..03<br/>Respond and confirm"]
+  A --> MEMBER["FLOW-MEMBER-01<br/>Profile and history"]
+  R[Reviewer] --> REVIEW["FLOW-REVIEW-01<br/>Queue and decision"]
+  M[Course manager] --> COURSE["FLOW-COURSE-01<br/>Course operations"]
+  O[Operator] --> CHECKIN["FLOW-CHECKIN-01<br/>Verify and arrive"]
+  T[Teacher/report user] --> REPORT["FLOW-REPORT-01..02<br/>Screen, export, print"]
+  S[System worker] --> MAINT["FLOW-MAINT-01<br/>Console maintenance"]
+  APP -. legacy seam .-> LEGACY[Legacy Compatibility]
+  INV -. legacy seam .-> LEGACY
+  PUB --> CATALOG[Course Catalog]
+  AUTH --> IDENTITY[Identity &amp; Access]
+  APP --> WORKFLOW[Application Workflow]
+  APP --> FORMS[Form Engine]
+  INV --> INVITES[Invitations &amp; Confirmations]
+  MAINT --> INVITES
+  REVIEW --> REVIEWS[Review &amp; Selection]
+  COURSE --> WORKFLOW
+  CHECKIN --> ATTEND[Check-in &amp; Attendance]
+  REPORT --> EXPORTS[Reports &amp; Exports]
+          </pre>
+        </div>
+
+        <div class="grid gap-5 lg:grid-cols-3">
+          <article class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="eyebrow text-xs font-bold text-indigo-700">Four guided variants</p>
+            <ul class="mt-4 space-y-3 text-sm text-slate-600">
+              <li><b class="text-slate-900">pre-new</b> · profile → preferences → consent</li>
+              <li><b class="text-slate-900">pre-alumni</b> · profile → history → preferences → consent</li>
+              <li><b class="text-slate-900">post-new</b> · profile → preferences → teacher → commitment → management</li>
+              <li><b class="text-slate-900">post-alumni</b> · profile → history → preferences → teacher → commitment → management</li>
+            </ul>
+          </article>
+          <article class="rounded-2xl border border-red-200 bg-red-50 p-6">
+            <p class="eyebrow text-xs font-bold text-red-700">Must fix</p>
+            <ul class="mt-4 space-y-2 text-sm text-red-950/75">
+              <li>State-changing GET links.</li>
+              <li>Client-influenced IDs/status.</li>
+              <li>Public check-in PII search.</li>
+              <li>Plaintext password recovery.</li>
+              <li>Mutation before mail/fatal failure.</li>
+              <li>Latest-only review explanation.</li>
+            </ul>
+          </article>
+          <article class="rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+            <p class="eyebrow text-xs font-bold text-emerald-700">Every new flow state</p>
+            <p class="mt-4 text-sm leading-6 text-emerald-950/75">
+              Loading, empty, validation, denied, expired or stale, partial external failure,
+              interrupted retry, and success. Each has accessible copy and a legal next action.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="module-map" class="space-y-8">
+        <div>
+          <p class="eyebrow text-xs font-bold text-indigo-700">SA ownership model</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">Seventeen modules. One state owner for each rule.</h2>
+          <p class="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
+            Modular monolith. Narrow interfaces hide deep validation, persistence, transition, audit,
+            retry, and compatibility implementations. Cross-module calls use in-process seams.
+          </p>
+        </div>
+
+        <div class="grid gap-6 lg:grid-cols-[1fr_.55fr]">
+          <div class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="eyebrow text-xs font-bold text-slate-500">Business modules</p>
+            <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <span class="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white">Identity &amp; Access</span>
+              <span class="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white">People &amp; Profiles</span>
+              <span class="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white">Reference Data</span>
+              <span class="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white">Course Catalog &amp; Sessions</span>
+              <span class="rounded-lg bg-indigo-700 px-3 py-3 text-sm font-semibold text-white">Form Engine</span>
+              <span class="rounded-lg bg-indigo-700 px-3 py-3 text-sm font-semibold text-white">Application Workflow</span>
+              <span class="rounded-lg bg-indigo-700 px-3 py-3 text-sm font-semibold text-white">Review &amp; Selection</span>
+              <span class="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white">Invitations &amp; Confirmations</span>
+              <span class="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white">Check-in &amp; Attendance</span>
+              <span class="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white">Operations &amp; Facilities</span>
+              <span class="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white">Notifications</span>
+              <span class="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white">Reports &amp; Exports</span>
+              <span class="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white">Documents &amp; Consent</span>
+              <span class="rounded-lg bg-slate-900 px-3 py-3 text-sm font-semibold text-white">Audit &amp; Compliance</span>
+            </div>
+          </div>
+          <div class="space-y-4">
+            <div class="rounded-2xl border border-dashed border-slate-400 bg-white p-6">
+              <p class="eyebrow text-xs font-bold text-slate-500">Transitional/technical</p>
+              <ul class="mt-4 space-y-2 text-sm font-semibold">
+                <li>15 · Legacy Compatibility</li>
+                <li>16 · Design System</li>
+                <li>17 · Platform Operations</li>
+              </ul>
+            </div>
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+              <p class="eyebrow text-xs font-bold text-amber-800">Course Workspace</p>
+              <p class="mt-3 text-sm leading-6 text-amber-950/75">
+                Composed experience. It presents projections from course, application, review,
+                invitation, check-in, operations, and report modules. It owns no lifecycle state.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-indigo-200 bg-indigo-50 p-6">
+          <div class="grid gap-5 lg:grid-cols-[.45fr_1fr]">
+            <div>
+              <p class="eyebrow text-xs font-bold text-indigo-700">Required correction</p>
+              <h3 class="mt-2 text-2xl font-bold">Review history per course</h3>
+            </div>
+            <p class="text-sm leading-6 text-indigo-950/75">
+              Each review round binds to one immutable application submission. Private drafts remain mutable.
+              Submitted reviews, criteria, scores, decisions, and decision events are immutable. Course A and
+              Course B never overwrite each other. Corrections supersede; reconsideration opens another round.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="design-system" class="space-y-8">
+        <div>
+          <p class="eyebrow text-xs font-bold text-indigo-700">One Corporate Identity and CSS system</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">One token source. Four controlled adapters.</h2>
+        </div>
+
+        <div class="grid gap-6 lg:grid-cols-2">
+          <div class="paper-grid rounded-2xl border border-red-200 bg-white p-5">
+            <p class="eyebrow text-xs font-bold text-red-700">Current shallow presentation</p>
+            <pre class="mermaid" role="img" aria-label="Current pages load several framework generations and local styles">
+flowchart TB
+  P[Public pages] --> B5[Bootstrap 5.1.3]
+  P --> B4[style.css includes Bootstrap 4.3.1]
+  ADMIN[Admin pages] --> ALTE[AdminLTE and Bootstrap 4]
+  MSG[Message pages] --> MIX[Public plus AdminLTE plus framework mix]
+  P --> LOCAL[231 inline styles and 43 style blocks]
+  ADMIN --> LOCAL
+  LOCAL --> COLLIDE[Load-order and page-specific behavior]
+            </pre>
+          </div>
+          <div class="paper-grid rounded-2xl border border-emerald-200 bg-white p-5">
+            <p class="eyebrow text-xs font-bold text-emerald-700">Target deep module</p>
+            <pre class="mermaid" role="img" aria-label="Canonical design tokens generate controlled web legacy email and print adapters">
+flowchart TB
+  TOKENS["DTCG token source"] --> BUILD[Deterministic token build]
+  BUILD --> WEB[Web React adapter]
+  BUILD --> LEGACY[Legacy Blade adapter]
+  BUILD --> EMAIL[Email adapter]
+  BUILD --> PRINT[Print adapter]
+  WEB --> UI["Primitives → patterns → page templates"]
+  UI --> TESTS[A11y, responsive, visual, budget gates]
+  LEGACY --> TESTS
+  EMAIL --> TESTS
+  PRINT --> TESTS
+            </pre>
+          </div>
+        </div>
+
+        <div class="grid gap-5 md:grid-cols-4">
+          <article class="rounded-2xl border border-slate-200 bg-white p-5">
+            <p class="eyebrow text-xs font-bold text-slate-500">Tokens</p>
+            <p class="mt-3 text-sm leading-6 text-slate-600">Reference → semantic → rare approved pattern aliases. Pages never consume raw palette values.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-5">
+            <p class="eyebrow text-xs font-bold text-slate-500">Primitives</p>
+            <p class="mt-3 text-sm leading-6 text-slate-600">Button, field, choice, dialog, status, data grid, disclosure, date/time, feedback.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-5">
+            <p class="eyebrow text-xs font-bold text-slate-500">Patterns</p>
+            <p class="mt-3 text-sm leading-6 text-slate-600">Form section, stepper, filter bar, bulk preview, identity compare, report table, result state.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 bg-white p-5">
+            <p class="eyebrow text-xs font-bold text-slate-500">Templates</p>
+            <p class="mt-3 text-sm leading-6 text-slate-600">Public, Auth, Application, Member, Workspace, Check-in, Report, Print, Email.</p>
+          </article>
+        </div>
+
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div class="grid sm:grid-cols-3">
+            <div class="bg-[#2F2925] p-6 text-white"><p class="text-xs uppercase tracking-widest text-stone-300">Text</p><p class="mt-2 font-mono">#2F2925</p></div>
+            <div class="bg-[#765B49] p-6 text-white"><p class="text-xs uppercase tracking-widest text-stone-200">Brand</p><p class="mt-2 font-mono">#765B49</p></div>
+            <div class="bg-[#176B49] p-6 text-white"><p class="text-xs uppercase tracking-widest text-emerald-100">Action</p><p class="mt-2 font-mono">#176B49</p></div>
+          </div>
+          <div class="grid gap-4 p-6 text-sm sm:grid-cols-3">
+            <div><b>Thai-first</b><p class="mt-1 text-slate-600">Sarabun, `lang="th"`, Buddhist-year policy, readable density.</p></div>
+            <div><b>Responsive</b><p class="mt-1 text-slate-600">No UA branches, disabled zoom, or fixed 960/1800/2980 px pages.</p></div>
+            <div><b>Contained migration</b><p class="mt-1 text-slate-600"><span class="font-mono">data-ui-generation</span> isolates legacy and next cascades.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="candidates" class="space-y-12">
+        <div>
+          <p class="eyebrow text-xs font-bold text-indigo-700">Deepening candidates</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">Move complexity behind five narrow interfaces.</h2>
+        </div>
+
+        <article id="candidate-workflow" class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div><h3 class="text-2xl font-bold">1. Collapse application state into ApplicationWorkflow</h3><p class="mt-2 font-mono text-xs text-slate-500">ApplyController.php · BackendApproveController.php · BackendCourseController.php · commands · helpers</p></div>
+            <div class="flex gap-2 text-xs font-bold"><span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">Strong</span><span class="rounded-full bg-slate-100 px-3 py-1">in-process</span></div>
+          </div>
+          <div class="grid gap-5 lg:grid-cols-2">
+            <div class="paper-grid rounded-xl border border-red-200 p-4"><p class="eyebrow text-xs font-bold text-red-700">Before · leakage</p><pre class="mermaid" role="img" aria-label="Current applicant routes, admin routes, and scheduled commands write application status and send mail independently">
+flowchart TB
+  A[Applicant route] --> C1[Apply controller]
+  B[Admin route] --> C2[Approve controller]
+  J[Scheduled command] --> H[Helper]
+  C1 --> DB[(apply_course)]
+  C2 --> DB
+  H --> DB
+  C1 --> M[Mail]
+  C2 --> M
+  H --> M
+  C1 --> S[Status strings]
+  C2 --> S
+  classDef leak fill:#fef2f2,stroke:#dc2626;
+  class C1,C2,H,DB,M,S leak;
+            </pre></div>
+            <div class="paper-grid rounded-xl border border-slate-300 p-4"><p class="eyebrow text-xs font-bold text-slate-600">After · deep module</p><pre class="mermaid" role="img" aria-label="HTTP and command adapters call one deep ApplicationWorkflow module that owns rules, authorization, audit, database writes, and outbox events">
+flowchart TB
+  A[HTTP adapter] --> W[ApplicationWorkflow]
+  B[CLI adapter] --> W
+  W --> DB[(PostgreSQL)]
+  W --> O[Outbox]
+  subgraph DEEP[Deep implementation]
+    W
+    RULES[Transition rules]
+    AUTH[Authorization]
+    AUDIT[Status events]
+  end
+  classDef deep fill:#0f172a,stroke:#020617,color:#fff;
+  class W,RULES,AUTH,AUDIT deep;
+            </pre></div>
+          </div>
+          <div class="grid gap-6 md:grid-cols-[1fr_1fr_auto]">
+            <div><p class="text-xs font-bold uppercase text-red-700">Problem</p><p class="mt-1 text-sm">State, email, persistence, and labels leak across shallow modules.</p></div>
+            <div><p class="text-xs font-bold uppercase text-emerald-700">Solution</p><p class="mt-1 text-sm">One interface owns transitions, audit, authorization, and outbox atomicity.</p></div>
+            <div><p class="text-xs font-bold uppercase text-slate-500">Wins</p><ul class="mt-1 text-sm"><li>locality: state rules</li><li>leverage: every actor</li><li>one test surface</li></ul></div>
+          </div>
+          <p class="rounded-lg bg-amber-50 px-4 py-3 text-xs text-amber-900"><b>ADR:</b> Review decision remains separate from application state.</p>
+        </article>
+
+        <article id="candidate-forms" class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div><h3 class="text-2xl font-bold">2. Replace numeric-ID logic with FormEngine</h3><p class="mt-2 font-mono text-xs text-slate-500">Guided/* · question tables · db_scripts/11.prod_question_sequence_runbook.sql · Blade variants</p></div>
+            <div class="flex gap-2 text-xs font-bold"><span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">Strong</span><span class="rounded-full bg-slate-100 px-3 py-1">local-substitutable</span></div>
+          </div>
+          <div class="grid gap-5 lg:grid-cols-2">
+            <div class="rounded-xl border border-red-200 bg-red-50/30 p-5">
+              <p class="eyebrow text-xs font-bold text-red-700">Before · shallow bands</p>
+              <div class="mt-4 space-y-2 text-xs">
+                <div class="border-l-4 border-red-500 bg-white p-3">Controller selects numeric group ID</div>
+                <div class="border-l-4 border-red-500 bg-white p-3">Blade chooses user-agent/persona variant</div>
+                <div class="border-l-4 border-red-500 bg-white p-3">JavaScript repeats visibility rules</div>
+                <div class="border-l-4 border-red-500 bg-white p-3">SQL assumes AUTO_INCREMENT sequence</div>
+                <div class="border-l-4 border-red-500 bg-white p-3">Reports read latest labels</div>
+              </div>
+            </div>
+            <div class="rounded-xl border border-slate-300 bg-slate-50 p-5">
+              <p class="eyebrow text-xs font-bold text-slate-600">After · interface shrinks</p>
+              <div class="deep mt-4 rounded-xl border-4 border-slate-950 p-5 text-white">
+                <p class="text-center text-xs font-bold uppercase tracking-wider">FormEngine</p>
+                <div class="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-300">
+                  <span class="rounded bg-white/10 p-2">semantic keys</span><span class="rounded bg-white/10 p-2">immutable versions</span>
+                  <span class="rounded bg-white/10 p-2">persona rules</span><span class="rounded bg-white/10 p-2">validation rules</span>
+                  <span class="rounded bg-white/10 p-2">repeatable fields</span><span class="rounded bg-white/10 p-2">answer snapshots</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-6 md:grid-cols-[1fr_1fr_auto]">
+            <div><p class="text-xs font-bold uppercase text-red-700">Problem</p><p class="mt-1 text-sm">Fixed IDs and duplicated rules make form history unsafe.</p></div>
+            <div><p class="text-xs font-bold uppercase text-emerald-700">Solution</p><p class="mt-1 text-sm">Publish immutable semantic-key versions; snapshot labels on submit.</p></div>
+            <div><p class="text-xs font-bold uppercase text-slate-500">Wins</p><ul class="mt-1 text-sm"><li>deep rule locality</li><li>historical replay</li><li>four flows, one seam</li></ul></div>
+          </div>
+          <p class="rounded-lg bg-amber-50 px-4 py-3 text-xs text-amber-900"><b>ADR:</b> Profile, training, manager, and attendance stay typed data.</p>
+        </article>
+
+        <article id="candidate-notifications" class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div><h3 class="text-2xl font-bold">3. Put communications behind Notifications</h3><p class="mt-2 font-mono text-xs text-slate-500">Helper::EmailSend · EmailServices · Mail classes · RequestConfirm · TwilioVerifyService</p></div>
+            <div class="flex gap-2 text-xs font-bold"><span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">Strong</span><span class="rounded-full bg-slate-100 px-3 py-1">mock</span></div>
+          </div>
+          <div class="grid gap-5 lg:grid-cols-2">
+            <div class="rounded-xl border border-red-200 p-5">
+              <p class="eyebrow text-xs font-bold text-red-700">Before · success can lie</p>
+              <div class="mt-5 flex items-center gap-2 text-xs">
+                <div class="rounded border border-red-300 bg-red-50 p-3">Write status</div><span class="text-red-600">→</span>
+                <div class="rounded border border-red-300 bg-red-50 p-3">SMTP call</div><span class="text-red-600">→</span>
+                <div class="rounded border border-red-300 bg-red-50 p-3">Catch error</div><span class="text-red-600">→</span>
+                <div class="rounded border border-red-300 bg-red-50 p-3">Ignore false</div>
+              </div>
+              <p class="mt-5 text-xs text-red-800">No durable request · no retry · no delivery state · relative attachments</p>
+            </div>
+            <div class="rounded-xl border border-slate-300 p-5">
+              <p class="eyebrow text-xs font-bold text-slate-600">After · real seam, two adapters</p>
+              <div class="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-xs">
+                <div class="deep rounded-xl p-4 text-white"><b>Notifications.request / status</b><p class="mt-2 text-slate-300">intent · recipient · attachments · dedupe</p></div>
+                <span>→</span>
+                <div class="space-y-2"><div class="rounded border-2 border-slate-600 p-3">Outbox worker → Postmark adapter</div><div class="seam rounded border-2 border-slate-400 p-3">Outbox worker → fake adapter</div></div>
+              </div>
+              <p class="mt-4 text-xs text-slate-500">Business modules request. Only the outbox worker crosses the MailGateway provider seam.</p>
+            </div>
+          </div>
+          <div class="grid gap-6 md:grid-cols-[1fr_1fr_auto]">
+            <div><p class="text-xs font-bold uppercase text-red-700">Problem</p><p class="mt-1 text-sm">Provider and delivery details leak into state-changing code.</p></div>
+            <div><p class="text-xs font-bold uppercase text-emerald-700">Solution</p><p class="mt-1 text-sm">Durable messages, provider adapter, webhooks, retry, and previews.</p></div>
+            <div><p class="text-xs font-bold uppercase text-slate-500">Wins</p><ul class="mt-1 text-sm"><li>delivery locality</li><li>deterministic fake</li><li>status stays honest</li></ul></div>
+          </div>
+        </article>
+
+        <article id="candidate-identity" class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div><h3 class="text-2xl font-bold">4. Split device read from server verification</h3><p class="mt-2 font-mono text-xs text-slate-500">cardreader_service/_sourcecode/main.go · check-in browser · IdentityVerificationWorkflow</p></div>
+            <div class="flex gap-2 text-xs font-bold"><span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">Strong</span><span class="rounded-full bg-slate-100 px-3 py-1">mock</span></div>
+          </div>
+          <div class="grid gap-5 lg:grid-cols-2">
+            <div class="rounded-xl border border-red-200 bg-red-50/30 p-5">
+              <p class="eyebrow text-xs font-bold text-red-700">Before · exposed companion</p>
+              <div class="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center text-xs">
+                <div class="rounded border border-red-300 bg-white p-4">Any local or network caller</div>
+                <span class="text-red-600">→</span>
+                <div class="rounded border border-red-300 bg-white p-4">All-interface HTTP agent<br/>full card payload</div>
+              </div>
+              <p class="mt-4 text-xs text-red-800">No challenge · no pairing · unsigned remote CORS · no revocation</p>
+            </div>
+            <div class="rounded-xl border border-slate-300 bg-slate-50 p-5">
+              <p class="eyebrow text-xs font-bold text-slate-600">After · browser and server seams</p>
+              <div class="mt-4 grid grid-cols-2 gap-2 text-center text-xs">
+                <div class="rounded border-2 border-indigo-600 bg-white p-3">Laravel<br/><b>issue challenge</b></div>
+                <div class="rounded border-2 border-indigo-600 bg-white p-3">Browser<br/><b>IdentityReader</b></div>
+                <div class="rounded border-2 border-slate-600 bg-white p-3">Paired 127.0.0.1 companion<br/><b>signed assertion</b></div>
+                <div class="deep rounded border-2 border-slate-950 p-3 text-white">Laravel<br/><b>verify assertion</b></div>
+              </div>
+              <p class="mt-4 text-xs text-slate-500">Device key pairing · rotation · revocation · minimum fields · manual adapter</p>
+            </div>
+          </div>
+          <div class="grid gap-6 md:grid-cols-[1fr_1fr_auto]">
+            <div><p class="text-xs font-bold uppercase text-red-700">Problem</p><p class="mt-1 text-sm">A server cannot call an operator's loopback address; the current agent exposes too much.</p></div>
+            <div><p class="text-xs font-bold uppercase text-emerald-700">Solution</p><p class="mt-1 text-sm">Browser adapter reads locally; server workflow issues and verifies signed assertions.</p></div>
+            <div><p class="text-xs font-bold uppercase text-slate-500">Wins</p><ul class="mt-1 text-sm"><li>device locality</li><li>real verification seam</li><li>manual adapter remains</li></ul></div>
+          </div>
+          <p class="rounded-lg bg-amber-50 px-4 py-3 text-xs text-amber-900"><b>ADR:</b> Remove unsigned remote CORS configuration; never require the device.</p>
+        </article>
+
+        <article id="candidate-reports" class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div><h3 class="text-2xl font-bold">5. Version report specifications, queue artifacts</h3><p class="mt-2 font-mono text-xs text-slate-500">BackendReportController.php · BackendExportController.php · backend/report/* · backend/teacher/*</p></div>
+            <div class="flex gap-2 text-xs font-bold"><span class="rounded-full bg-amber-100 px-3 py-1 text-amber-900">Worth exploring</span><span class="rounded-full bg-slate-100 px-3 py-1">local-substitutable</span></div>
+          </div>
+          <div class="grid gap-5 lg:grid-cols-2">
+            <div class="paper-grid rounded-xl border border-red-200 p-5">
+              <p class="eyebrow text-xs font-bold text-red-700">Before · duplicated call tree</p>
+              <div class="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+                <div class="rounded border border-red-300 bg-white p-2">HTML report<br/><span class="text-red-600">query + grouping</span></div>
+                <div class="rounded border border-red-300 bg-white p-2">XLSX export<br/><span class="text-red-600">query + grouping</span></div>
+                <div class="rounded border border-red-300 bg-white p-2">Print view<br/><span class="text-red-600">query + grouping</span></div>
+              </div>
+              <div class="mx-auto mt-3 h-8 w-px bg-red-400"></div>
+              <div class="rounded border border-red-300 bg-red-50 p-3 text-center text-xs">Status strings · question IDs · Thai labels · direct joins</div>
+            </div>
+            <div class="paper-grid rounded-xl border border-slate-300 p-5">
+              <p class="eyebrow text-xs font-bold text-slate-600">After · one specification</p>
+              <div class="deep mt-4 rounded-xl p-5 text-center text-white">
+                <b>Versioned report specification</b>
+                <p class="mt-2 text-xs text-slate-300">authorized fields · classification · order · labels · dates</p>
+                <div class="mt-4 grid grid-cols-3 gap-2 text-xs"><span class="rounded bg-white/10 p-2">screen</span><span class="rounded bg-white/10 p-2">print</span><span class="rounded bg-white/10 p-2">XLSX</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-6 md:grid-cols-[1fr_1fr_auto]">
+            <div><p class="text-xs font-bold uppercase text-red-700">Problem</p><p class="mt-1 text-sm">Display, print, and export semantics drift independently.</p></div>
+            <div><p class="text-xs font-bold uppercase text-emerald-700">Solution</p><p class="mt-1 text-sm">One specification feeds screen, print, and queued PhpSpreadsheet.</p></div>
+            <div><p class="text-xs font-bold uppercase text-slate-500">Wins</p><ul class="mt-1 text-sm"><li>parity leverage</li><li>field locality</li><li>golden-test interface</li></ul></div>
+          </div>
+          <p class="rounded-lg bg-amber-50 px-4 py-3 text-xs text-amber-900"><b>ADR:</b> Preserve eight sheets, five teacher groups, and max-ten print until signed retirement.</p>
+        </article>
+      </section>
+
+      <section id="top-recommendation" class="rounded-3xl bg-indigo-700 p-8 text-white sm:p-12">
+        <p class="eyebrow text-xs font-bold text-indigo-200">Top recommendation</p>
+        <div class="mt-5 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div><h2 class="font-serif text-4xl font-semibold">Start with ApplicationWorkflow.</h2><p class="mt-3 max-w-3xl text-indigo-100">Every applicant, reviewer, notification, report, migration rule, and audit trail depends on one trustworthy lifecycle.</p></div>
+          <a class="shrink-0 rounded-lg bg-white px-5 py-3 text-sm font-bold text-indigo-800" href="#candidate-workflow">View candidate ↑</a>
+        </div>
+      </section>
+
+      <section id="architecture" class="space-y-8">
+        <div>
+          <p class="eyebrow text-xs font-bold text-indigo-700">Architecture decision</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">One application core. Twelve deep modules.</h2>
+        </div>
+        <div class="grid gap-5 lg:grid-cols-2">
+          <div class="rounded-2xl border-2 border-emerald-500 bg-emerald-50 p-7">
+            <div class="flex justify-between"><b>Preferred</b><span class="rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white">Lower migration risk</span></div>
+            <h3 class="mt-5 text-2xl font-bold">Laravel modular monolith</h3>
+            <p class="mt-2 text-sm text-slate-600">Laravel 13 · PHP 8.5 · React 19 · Inertia 3 · PostgreSQL 18 · Redis/Horizon</p>
+            <ul class="mt-5 space-y-2 text-sm"><li>✓ One deployable application</li><li>✓ Best Laravel hash/token compatibility</li><li>✓ Strong UI without separate backend</li><li>✓ Modules can deepen before extraction</li></ul>
+          </div>
+          <div class="rounded-2xl border border-slate-300 bg-white p-7 opacity-80">
+            <div class="flex justify-between"><b>Conditional alternative</b><span class="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold">Higher risk</span></div>
+            <h3 class="mt-5 text-2xl font-bold">Next.js + NestJS platform</h3>
+            <p class="mt-2 text-sm text-slate-600">Two runtimes · independent frontend/backend · OpenAPI</p>
+            <ul class="mt-5 space-y-2 text-sm"><li>Use only for committed multi-client needs</li><li>Harder token/password bridge</li><li>Distributed transaction cost</li><li>More deployment and observability work</li></ul>
+          </div>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-6">
+          <pre class="mermaid" role="img" aria-label="Laravel modular monolith with HTTP, command, worker, compatibility, browser identity, external provider, and local device adapters">
+flowchart TB
+  subgraph ADAPTERS[Adapters]
+    WEB[Blade public + Inertia authenticated]
+    CLI[CLI + scheduler]
+    WORK[Queue worker]
+    LEG[Legacy compatibility]
+    BROWSER[Browser IdentityReader]
+  end
+  subgraph CORE[Deep domain modules]
+    IAM[Identity &amp; Access]
+    PEOPLE[People &amp; Profiles]
+    COURSE[Course Catalog]
+    FLOW[Applications &amp; Workflow]
+    FORM[Forms &amp; Responses]
+    REVIEW[Review &amp; Selection]
+    INV[Invitations &amp; Confirmations]
+    CHECK[Check-in]
+    REPORT[Reports &amp; Exports]
+    NOTE[Notifications]
+    DOC[Documents]
+    AUDIT[Audit &amp; Compliance]
+    VERIFY[Identity Verification]
+  end
+  subgraph PORTS[External adapters]
+    PG[(PostgreSQL 18)]
+    REDIS[(Redis)]
+    POST[Postmark]
+    S3[(S3)]
+    OBS[Monitoring]
+  end
+  subgraph DEVICE[Operator workstation]
+    CARD[Paired 127.0.0.1 companion]
+  end
+  WEB --> FLOW
+  CLI --> FLOW
+  WORK --> NOTE
+  LEG --> FLOW
+  WEB --> VERIFY
+  BROWSER --> CARD
+  BROWSER --> VERIFY
+  VERIFY --> AUDIT
+  FLOW --> FORM
+  FLOW --> REVIEW
+  FLOW --> INV
+  INV --> NOTE
+  CHECK --> FLOW
+  REPORT --> FLOW
+  CORE -.seam.-> PORTS
+  classDef deep fill:#0f172a,stroke:#020617,color:#fff;
+  class IAM,PEOPLE,COURSE,FLOW,FORM,REVIEW,INV,CHECK,REPORT,NOTE,DOC,AUDIT,VERIFY deep;
+          </pre>
+        </div>
+        <div class="grid gap-4 md:grid-cols-3">
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="text-xs font-bold text-indigo-700">WEB</p><p class="mt-2 text-sm">Blade public pages; Inertia React authenticated flows. No Node SSR process.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="text-xs font-bold text-indigo-700">WORKER</p><p class="mt-2 text-sm">Horizon on dedicated TLS Redis/Valkey with cluster mode disabled.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-5"><p class="text-xs font-bold text-indigo-700">SCHEDULER</p><p class="mt-2 text-sm">One schedule task with observable locks.</p></div>
+        </div>
+      </section>
+
+      <section id="schema" class="space-y-8">
+        <div>
+          <p class="eyebrow text-xs font-bold text-indigo-700">Target data model</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">History becomes immutable and explainable.</h2>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-5">
+          <div class="overflow-x-auto">
+          <pre class="mermaid" role="img" aria-label="Target entity relationships showing people and accounts, courses and applications, immutable submissions, per-course review rounds, submitted reviews, decisions, versioned forms, invitations, check-in, consent, notification, and audit">
+erDiagram
+  PERSON ||--o{ ACCOUNT : may_use
+  PERSON ||--o{ PERSON_IDENTIFIER : has
+  PERSON ||--o{ TRAINING_EXPERIENCE : records
+  PERSON ||--o{ TRAINING_SUMMARY : preserves
+  PERSON ||--o{ ALUMNI_ELIGIBILITY_EVENT : qualifies
+  PERSON ||--o{ APPLICATION : submits
+  COURSE ||--o{ COURSE_SESSION : schedules
+  COURSE_SESSION ||--o{ APPLICATION : receives
+  APPLICATION ||--o{ APPLICATION_STATUS_EVENT : records
+  APPLICATION ||--o{ APPLICATION_DRAFT : autosaves
+  APPLICATION_DRAFT ||--o{ APPLICATION_DRAFT_ANSWER : stages
+  APPLICATION_DRAFT ||--o| APPLICATION_SUBMISSION : freezes_to
+  APPLICATION_DRAFT ||--o{ APPLICATION_STEP : tracks
+  APPLICATION ||--o{ APPLICATION_SUBMISSION : versions
+  APPLICATION_SUBMISSION ||--|| APPLICATION_PROFILE_SNAPSHOT : freezes
+  APPLICATION_SUBMISSION ||--|| APPLICATION_TRAINING_SNAPSHOT : freezes
+  APPLICATION_SUBMISSION ||--o| APPLICATION_MANAGER_DETAIL : captures
+  APPLICATION_SUBMISSION ||--o{ APPLICATION_ANSWER : captures
+  APPLICATION_SUBMISSION ||--o{ REVIEW_ROUND : evaluated_in
+  REVIEW_ROUND ||--o{ REVIEW_ASSIGNMENT : assigns
+  REVIEW_ASSIGNMENT ||--o| REVIEW : submits
+  REVIEW_ROUND ||--o{ DECISION : concludes
+  DECISION ||--o{ DECISION_EVENT : records
+  APPLICATION ||--o{ INVITATION : receives
+  APPLICATION ||--o{ ACTION_TOKEN : authorizes
+  FORM_DEFINITION ||--o{ FORM_VERSION : publishes
+  FORM_VERSION ||--o{ FORM_SECTION : contains
+  FORM_SECTION ||--o{ QUESTION : contains
+  QUESTION ||--o{ QUESTION_CHOICE : offers
+  FORM_VERSION ||--o{ FORM_ASSIGNMENT : targets
+  FORM_VERSION ||--o{ APPLICATION_ANSWER : versions
+  APPLICATION ||--o| CHECKIN : reaches
+  CHECKIN ||--o{ IDENTITY_VERIFICATION_EVENT : verifies
+  APPLICATION ||--o{ FACILITY_REQUEST : requests
+  PERSON ||--o{ CONSENT_ACCEPTANCE : accepts
+  APPLICATION_SUBMISSION o|--o{ CONSENT_ACCEPTANCE : contextualizes
+  CONSENT_DOCUMENT ||--o{ CONSENT_DOCUMENT_VERSION : publishes
+  CONSENT_DOCUMENT_VERSION ||--o{ CONSENT_ACCEPTANCE : proves
+  APPLICATION ||--o{ NOTIFICATION_MESSAGE : triggers
+  NOTIFICATION_MESSAGE ||--o{ NOTIFICATION_DELIVERY : attempts
+  APPLICATION ||--o{ AUDIT_EVENT : explains
+            </pre>
+          </div>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-xl border-l-4 border-indigo-600 bg-white p-5"><b class="text-sm">Identity</b><p class="mt-2 text-xs leading-5 text-slate-600">Encrypted national ID plus separately keyed HMAC lookup. Never a URL or log value.</p></div>
+          <div class="rounded-xl border-l-4 border-indigo-600 bg-white p-5"><b class="text-sm">Forms</b><p class="mt-2 text-xs leading-5 text-slate-600">Semantic keys, immutable published versions, persona rules, label snapshots.</p></div>
+          <div class="rounded-xl border-l-4 border-indigo-600 bg-white p-5"><b class="text-sm">Applications</b><p class="mt-2 text-xs leading-5 text-slate-600">Mutable autosave draft freezes atomically into immutable submissions, snapshots, reviewed revisions, and status events.</p></div>
+          <div class="rounded-xl border-l-4 border-indigo-600 bg-white p-5"><b class="text-sm">Compliance</b><p class="mt-2 text-xs leading-5 text-slate-600">Consent versions, access events, retention, deletion, export expiry.</p></div>
+        </div>
+      </section>
+
+      <section id="integrations" class="space-y-8">
+        <div>
+          <p class="eyebrow text-xs font-bold text-indigo-700">External capability decisions</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">Buy delivery. Keep domain rules local.</h2>
+        </div>
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div class="overflow-x-auto">
+            <table class="min-w-[980px] w-full text-left text-xs">
+              <caption class="sr-only">Current external capabilities compared with recommended and fallback providers</caption>
+              <thead class="bg-slate-950 text-white"><tr><th scope="col" class="p-4">Capability</th><th scope="col" class="p-4">Current</th><th scope="col" class="p-4">Recommendation</th><th scope="col" class="p-4">Fallback</th><th scope="col" class="p-4">Operational rule</th></tr></thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr><td class="p-4 font-bold">Email verification</td><td class="p-4">Twilio Verify</td><td class="p-4 text-indigo-700">Signed link via Postmark</td><td class="p-4">Keyed-HMAC OTP or Twilio adapter</td><td class="p-4">Challenge ID · attempts · expiry · atomic redemption</td></tr>
+                <tr><td class="p-4 font-bold">Transactional email</td><td class="p-4">Synchronous SMTP</td><td class="p-4 text-indigo-700">Postmark</td><td class="p-4">SES</td><td class="p-4">Outbox · webhook · bounce · retry</td></tr>
+                <tr><td class="p-4 font-bold">Queue</td><td class="p-4">sync</td><td class="p-4 text-indigo-700">TLS Redis/Valkey + Horizon</td><td class="p-4">SQS</td><td class="p-4">Dedicated replication group · cluster mode off</td></tr>
+                <tr><td class="p-4 font-bold">Database</td><td class="p-4">MariaDB 10.5</td><td class="p-4 text-indigo-700">PostgreSQL 18</td><td class="p-4">MySQL 8.4 LTS</td><td class="p-4">PITR · Multi-AZ · restore drill</td></tr>
+                <tr><td class="p-4 font-bold">Spreadsheet</td><td class="p-4">PHPExcel 1.8.2</td><td class="p-4 text-indigo-700">Queued PhpSpreadsheet</td><td class="p-4">CSV</td><td class="p-4">Text coercion · audit · expiry</td></tr>
+                <tr><td class="p-4 font-bold">Object storage</td><td class="p-4">Public local files</td><td class="p-4 text-indigo-700">S3 versioned storage</td><td class="p-4">S3-compatible adapter</td><td class="p-4">Checksum · signed URL · lifecycle</td></tr>
+                <tr><td class="p-4 font-bold">Thai ID reader</td><td class="p-4">Open PC/SC HTTP agent</td><td class="p-4 text-indigo-700">Hardened loopback companion</td><td class="p-4">Manual verification</td><td class="p-4">Challenge · signature · minimum data</td></tr>
+                <tr><td class="p-4 font-bold">Maps</td><td class="p-4">Outbound Google link</td><td class="p-4 text-indigo-700">Keep outbound link</td><td class="p-4">OpenStreetMap link</td><td class="p-4">No PII in URL</td></tr>
+                <tr><td class="p-4 font-bold">Fonts</td><td class="p-4">Google Fonts</td><td class="p-4 text-indigo-700">Self-host Sarabun/Kanit</td><td class="p-4">System stack</td><td class="p-4">Version with app asset</td></tr>
+                <tr><td class="p-4 font-bold">Monitoring</td><td class="p-4">None confirmed</td><td class="p-4 text-indigo-700">Sentry or approved OTel</td><td class="p-4">CloudWatch minimum</td><td class="p-4">PII scrubbing · alert owner</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="rounded-xl border border-slate-300 bg-slate-100 p-5 text-sm">
+          <b>No-evidence rule:</b> no payment, LINE, SMS, analytics, social login, additional storage provider, or marketing platform is added beyond the gated decisions without an approved requirement and privacy review.
+        </div>
+      </section>
+
+      <section class="space-y-8">
+        <div>
+          <p class="eyebrow text-xs font-bold text-red-700">Non-negotiable release gate</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">Unsafe legacy behavior is not compatibility.</h2>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">Global CSRF exemption</div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">Wildcard PII CORS</div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">Public check-in PII lookup</div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">State-changing GET routes</div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">Raw HTML + callback redirect</div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">Plaintext password flows</div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">Personal-ID-only recovery</div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">Public debug and phpinfo</div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">No backend rate limit</div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">Binary admin authorization</div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">Unauthenticated card agent</div>
+          <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">Export formula injection</div>
+        </div>
+      </section>
+
+      <section id="migration" class="space-y-8">
+        <div>
+          <p class="eyebrow text-xs font-bold text-indigo-700">Migration strategy</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">Cohort cutover, evidence at every gate.</h2>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-6">
+          <pre class="mermaid" role="img" aria-label="Migration phases from production truth through compatibility, idempotent ETL, shadow validation, cohort cutover, and retirement">
+flowchart LR
+  P0[0 · Production truth<br/>DDL · profile · decisions] --> P1[1 · Compatibility shell<br/>URLs · tokens · hashes]
+  P1 --> P2[2 · Idempotent ETL<br/>legacy IDs · quarantine]
+  P2 --> P3[3 · Shadow validation<br/>counts · golden outputs]
+  P3 --> P4[4 · One cohort<br/>freeze · checksum · switch]
+  P4 --> P5[5 · Expand + retire<br/>telemetry · retention]
+  P3 -.fail.-> P2
+  P4 -.rollback before writes.-> P3
+          </pre>
+        </div>
+        <div class="grid gap-4 lg:grid-cols-3">
+          <div class="rounded-2xl border border-slate-200 bg-white p-6">
+            <p class="eyebrow text-xs font-bold text-slate-500">ETL order</p>
+            <ol class="mt-4 space-y-2 text-sm text-slate-700">
+              <li>1. Reference and locations</li><li>2. Accounts and people</li><li>3. Courses, sessions, documents</li><li>4. Form versions</li><li>5. Applications, active drafts, submissions, snapshots, manager, alumni</li><li>6. Answers</li><li>7. Training summaries/rows and attendance</li><li>8. Reviews, decisions, invitations, action tokens</li><li>9. Check-ins, facilities, staff assignments</li><li>10. Consents, notifications, exports, documents, audits</li>
+            </ol>
+          </div>
+          <div class="rounded-2xl border border-amber-300 bg-amber-50 p-6">
+            <p class="eyebrow text-xs font-bold text-amber-800">Open decisions</p>
+            <ul class="mt-4 space-y-2 text-sm text-amber-950">
+              <li>CLARIFY-001 · additional fields</li><li>CLARIFY-002 · Dhamma worker</li><li>CLARIFY-003 · substance value</li><li>CLARIFY-004 · Q082</li><li>CLARIFY-005 · Email 2</li><li>CLARIFY-006 · SSL ownership</li>
+            </ul>
+          </div>
+          <div class="rounded-2xl border border-red-300 bg-red-50 p-6">
+            <p class="eyebrow text-xs font-bold text-red-800">Cutover blockers</p>
+            <ul class="mt-4 space-y-2 text-sm text-red-950">
+              <li>External target schema absent</li><li>Live DDL/data unprofiled</li><li>Active encrypted links unknown</li><li>Shared-aggregate ownership open</li><li>RBAC matrix unsigned</li><li>Golden status/report matrices missing</li><li>PDPA retention unsigned</li><li>AWS availability/RPO/RTO open</li>
+            </ul>
+          </div>
+        </div>
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div class="grid grid-cols-[70px_1fr_1fr] bg-slate-950 p-4 text-xs font-bold text-white"><span>Gate</span><span>Artifact</span><span>Exit</span></div>
+          <div class="grid grid-cols-[70px_1fr_1fr] border-b border-slate-100 p-4 text-xs"><b>G0</b><span>Production DDL + data profile</span><span>Reproducible baseline</span></div>
+          <div class="grid grid-cols-[70px_1fr_1fr] border-b border-slate-100 p-4 text-xs"><b>G1–G3</b><span>Target schema + lifecycle + compatibility + coexistence</span><span>Every field/state/URL mapped; one writer per shared aggregate</span></div>
+          <div class="grid grid-cols-[70px_1fr_1fr] border-b border-slate-100 p-4 text-xs"><b>G4–G6</b><span>RBAC + forms + golden parity</span><span>Approved matrices and fixtures</span></div>
+          <div class="grid grid-cols-[70px_1fr_1fr] border-b border-slate-100 p-4 text-xs"><b>G7–G8</b><span>Privacy + infrastructure</span><span>Retention, residency, RPO/RTO, cost</span></div>
+          <div class="grid grid-cols-[70px_1fr_1fr] p-4 text-xs"><b>G9</b><span>Rehearsal + rollback + support</span><span>Signed go/no-go</span></div>
+        </div>
+      </section>
+
+      <section id="verdict" class="space-y-8">
+        <div>
+          <p class="eyebrow text-xs font-bold text-indigo-700">Traceability and validation</p>
+          <h2 class="mt-2 font-serif text-4xl font-semibold">Specification passes. Production start is conditional.</h2>
+        </div>
+        <div class="grid gap-5 lg:grid-cols-3">
+          <div class="rounded-2xl border border-emerald-300 bg-emerald-50 p-6">
+            <p class="text-sm font-bold text-emerald-800">PASS · Product coverage</p>
+            <ul class="mt-4 space-y-2 text-sm text-emerald-950"><li>All verified feature families mapped</li><li>Four guided variants preserved</li><li>Reports, PDFs, email, check-in included</li><li>Retirement safeguards explicit</li></ul>
+          </div>
+          <div class="rounded-2xl border border-emerald-300 bg-emerald-50 p-6">
+            <p class="text-sm font-bold text-emerald-800">PASS · Architecture direction</p>
+            <ul class="mt-4 space-y-2 text-sm text-emerald-950"><li>Compatible target stack</li><li>Deep modules and interfaces defined</li><li>Provider adapters and fakes defined</li><li>Security replacements explicit</li></ul>
+          </div>
+          <div class="rounded-2xl border border-amber-300 bg-amber-50 p-6">
+            <p class="text-sm font-bold text-amber-900">CONDITIONAL · Build and cutover</p>
+            <ul class="mt-4 space-y-2 text-sm text-amber-950"><li>Live schema and data required</li><li>Lifecycle/RBAC decisions required</li><li>Golden outputs required</li><li>Privacy and infrastructure required</li></ul>
+          </div>
+        </div>
+        <div class="rounded-3xl border-2 border-slate-900 bg-white p-8 sm:p-10">
+          <p class="eyebrow text-xs font-bold text-slate-500">Implementation sequence</p>
+          <div class="mt-6 grid gap-5 md:grid-cols-3">
+            <div><p class="text-4xl font-bold text-indigo-700">01</p><h3 class="mt-2 font-bold">Establish truth</h3><p class="mt-2 text-sm text-slate-600">G0–G5. Production baseline, target mapping, lifecycle, compatibility, RBAC, forms.</p></div>
+            <div><p class="text-4xl font-bold text-indigo-700">02</p><h3 class="mt-2 font-bold">Build the safe core</h3><p class="mt-2 text-sm text-slate-600">ApplicationWorkflow first, then FormEngine, identity, course catalog, audit, compatibility.</p></div>
+            <div><p class="text-4xl font-bold text-indigo-700">03</p><h3 class="mt-2 font-bold">Prove parity by cohort</h3><p class="mt-2 text-sm text-slate-600">Course Workspace, communications, check-in, reports, golden comparison, rehearsal, cutover.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="border-t border-slate-200 py-10 text-xs text-slate-500">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p>Tapoda Next · repository-derived product and architecture blueprint</p>
+          <p>Static evidence · no live production database or hardware validation · CDN network required for Tailwind/Mermaid</p>
+        </div>
+      </footer>
+    </main>
+  </body>
+</html>
