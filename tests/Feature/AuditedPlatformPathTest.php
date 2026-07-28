@@ -2,7 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Modules\PlatformOperations\Contracts\CompletionAdapter;
+use App\Modules\PlatformOperations\Infrastructure\Completion\StructuredLogCompletionAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Mockery;
+use Psr\Log\LoggerInterface;
 use Tests\TestCase;
 
 final class AuditedPlatformPathTest extends TestCase
@@ -65,6 +70,81 @@ final class AuditedPlatformPathTest extends TestCase
 
         $this->assertDatabaseCount('platform_probe_runs', 1);
         $this->assertDatabaseCount('audit_events', 1);
+        $this->assertDatabaseCount('outbox_events', 1);
+    }
+
+    public function test_idempotency_key_is_scoped_to_the_authorized_actor(): void
+    {
+        $first = $this
+            ->withHeaders([
+                'Idempotency-Key' => 'probe-20260729-shared-key',
+                'X-Tapoda-Test-Actor' => 'platform-operator-a',
+            ])
+            ->postJson('/platform/probes')
+            ->assertAccepted();
+        $second = $this
+            ->withHeaders([
+                'Idempotency-Key' => 'probe-20260729-shared-key',
+                'X-Tapoda-Test-Actor' => 'platform-operator-b',
+            ])
+            ->postJson('/platform/probes')
+            ->assertAccepted();
+
+        $this->assertNotSame($first->json('data.id'), $second->json('data.id'));
+        $this->assertDatabaseCount('platform_probe_runs', 2);
+        $this->assertDatabaseCount('audit_events', 2);
+        $this->assertDatabaseCount('outbox_events', 2);
+    }
+
+    public function test_actor_cannot_read_another_actors_probe(): void
+    {
+        $probe = $this
+            ->withHeaders([
+                'Idempotency-Key' => 'probe-20260729-private',
+                'X-Tapoda-Test-Actor' => 'platform-operator-a',
+            ])
+            ->postJson('/platform/probes')
+            ->assertAccepted();
+
+        $this
+            ->withHeader('X-Tapoda-Test-Actor', 'platform-operator-b')
+            ->getJson('/platform/probes/'.$probe->json('data.id'))
+            ->assertNotFound();
+    }
+
+    public function test_completion_retry_after_adapter_success_has_one_effective_result(): void
+    {
+        $logger = Mockery::mock(LoggerInterface::class);
+        $logger
+            ->shouldReceive('info')
+            ->once()
+            ->with('Platform probe completed.', Mockery::on(
+                fn (array $context): bool => isset($context['probe_id'], $context['correlation_id']),
+            ));
+        $adapter = new StructuredLogCompletionAdapter(DB::connection(), $logger);
+        $this->app->instance(CompletionAdapter::class, $adapter);
+
+        $accepted = $this
+            ->withHeaders([
+                'Idempotency-Key' => 'probe-20260729-crash-window',
+                'X-Tapoda-Test-Actor' => 'platform-operator',
+            ])
+            ->postJson('/platform/probes')
+            ->assertAccepted();
+        $probe = DB::table('platform_probe_runs')->find($accepted->json('data.id'));
+
+        // Simulate adapter success followed by a process crash before worker DB completion.
+        $adapter->complete($probe->id, $probe->correlation_id);
+
+        $this->artisan('platform:relay-outbox')->assertSuccessful();
+
+        $this->assertDatabaseCount('platform_completion_receipts', 1);
+        $this->assertDatabaseHas('platform_probe_runs', [
+            'id' => $probe->id,
+            'status' => 'completed',
+            'completion_code' => 'structured-log.completed',
+        ]);
+        $this->assertDatabaseCount('audit_events', 2);
         $this->assertDatabaseCount('outbox_events', 1);
     }
 

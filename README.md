@@ -21,9 +21,9 @@ Open <http://127.0.0.1:8080>. Stop with `docker compose stop`.
 
 ```sh
 docker compose --profile tools run --rm test
-docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim npm run typecheck
-docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim npm run lint
-docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim npm run build
+docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d npm run typecheck
+docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d npm run lint
+docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d npm run build
 ```
 
 See [platform operations](docs/runbooks/platform-operations.md) for deploy, monitoring, rollback, and restore procedures.

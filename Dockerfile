@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
-ARG FRANKENPHP_IMAGE=dunglas/frankenphp:1-php8.5-bookworm
-ARG NODE_IMAGE=node:24-bookworm-slim
-ARG COMPOSER_IMAGE=composer:2
+ARG FRANKENPHP_IMAGE=dunglas/frankenphp:1-php8.5-bookworm@sha256:9c07e0c60c8f856e3730c618fa2376ccb7f2493c1379f7bbe8737d89531f2d2a
+ARG NODE_IMAGE=node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
+ARG COMPOSER_IMAGE=composer:2@sha256:5946476338742b200bb9ff88f8be56275ddae4b3949c72305cb0dbf10cfcb760
 
 FROM ${COMPOSER_IMAGE} AS composer-bin
 
@@ -62,6 +62,9 @@ ENV APP_ENV=testing
 COPY --from=php-test-dependencies /app/vendor ./vendor
 COPY --from=frontend-build /app/public/build ./public/build
 COPY . .
+RUN cp .env.example .env \
+    && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache
 RUN composer dump-autoload --no-interaction
 
 ENTRYPOINT []
@@ -86,10 +89,11 @@ COPY --from=frontend-build --chown=www-data:www-data /app/public/build ./public/
 COPY --chown=www-data:www-data . .
 COPY docker/frankenphp/Caddyfile /etc/caddy/Caddyfile
 
-RUN composer dump-autoload --no-dev --classmap-authoritative --no-interaction \
-    && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && mkdir -p /config/caddy /data/caddy \
     && chown -R www-data:www-data storage bootstrap/cache /config /data
+RUN composer dump-autoload --no-dev --classmap-authoritative --no-interaction \
+    && chown -R www-data:www-data storage bootstrap/cache
 
 USER www-data
 

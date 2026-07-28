@@ -10,6 +10,8 @@ bin/build-artifact 2026.07.29.1 FULL_GIT_COMMIT
 
 Record the image digest emitted by `docker image inspect`. Promote that exact digest to migration, web, worker, and scheduler processes. Do not rebuild per environment. Inject secrets and environment-specific adapter names at runtime.
 
+The platform maintainer owns container-input refreshes. Resolve each declared version tag to a reviewed digest in a dedicated dependency PR, update `Dockerfile`, `compose.yaml`, `bin/bootstrap-env`, and documented tool commands together, then rerun clean test/runtime/Compose builds, audits, browser checks, artifact identity, and smoke before approval. Never refresh a digest during deployment.
+
 Required production adapters:
 
 - `PLATFORM_ACTOR_ADAPTER=laravel-auth`
@@ -59,11 +61,34 @@ docker compose exec -T postgres pg_dump --format=custom --no-owner --username=ta
 Restore only into an isolated empty PostgreSQL instance:
 
 ```sh
-createdb tapoda_restore
-pg_restore --exit-on-error --no-owner --dbname=tapoda_restore tapoda.dump
+docker compose --profile restore up --detach --force-recreate postgres-restore redis-restore
+docker compose --profile restore exec -T postgres-restore pg_restore --exit-on-error --no-owner --username=tapoda --dbname=tapoda_restore < tapoda.dump
+docker compose --profile restore run --rm restore-migrate
 ```
 
-Run migrations, readiness, smoke, row-count/checksum reconciliation, and the audited probe test against the restored instance. Record elapsed time as simulated evidence only. This does not establish production RPO/RTO.
+Reconcile the source and restored data before starting processes that write heartbeats. Both database commands execute inside their local PostgreSQL containers:
+
+```sh
+docker compose exec -T postgres sh -c 'for table in platform_probe_runs audit_events outbox_events platform_completion_receipts; do printf "%s\n" "$table"; psql --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" --command="COPY (SELECT row_to_json(t)::text AS row FROM public.$table AS t ORDER BY row) TO STDOUT"; done | sha256sum'
+docker compose --profile restore exec -T postgres-restore sh -c 'for table in platform_probe_runs audit_events outbox_events platform_completion_receipts; do printf "%s\n" "$table"; psql --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" --command="COPY (SELECT row_to_json(t)::text AS row FROM public.$table AS t ORDER BY row) TO STDOUT"; done | sha256sum'
+```
+
+The digests must match. Then verify the restored runtime and audited path:
+
+```sh
+docker compose --profile restore up --detach restore-web restore-worker restore-scheduler
+bin/smoke http://127.0.0.1:18080
+docker compose --profile restore run --rm restore-test php artisan test --filter=AuditedPlatformPathTest
+```
+
+Record restore, migration, checksum, readiness, smoke, audited-probe, and elapsed-time results as simulated evidence only. Remove the ephemeral restore topology with:
+
+```sh
+docker compose --profile restore stop postgres-restore redis-restore restore-web restore-worker restore-scheduler
+docker compose --profile restore rm --force postgres-restore redis-restore restore-web restore-worker restore-scheduler
+```
+
+Its PostgreSQL data is tmpfs-backed and disappears with the removed container. The restore Redis/Horizon namespace is isolated so its worker heartbeat cannot be consumed by the primary local stack. This does not establish production RPO/RTO.
 
 ## Production exclusions
 

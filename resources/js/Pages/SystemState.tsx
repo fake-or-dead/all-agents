@@ -146,7 +146,7 @@ export default function SystemState({ build }: Props) {
                         </button>
                     </div>
 
-                    <p className="sr-only" aria-live="polite">
+                    <p className="sr-only" role="status" aria-live="polite">
                         {loading
                             ? "กำลังตรวจสอบสถานะระบบ"
                             : readiness?.status === "ready"

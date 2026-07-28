@@ -14,5 +14,5 @@ docker build \
     .
 
 docker image inspect \
-    --format 'image={{index .RepoTags 0}} id={{.Id}} version={{index .Config.Labels "org.opencontainers.image.version"}} commit={{index .Config.Labels "org.opencontainers.image.revision"}}' \
+    --format 'image={{index .RepoTags 0}} digest={{.Id}} version={{index .Config.Labels "org.opencontainers.image.version"}} commit={{index .Config.Labels "org.opencontainers.image.revision"}}' \
     "${image}"

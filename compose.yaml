@@ -28,6 +28,14 @@ x-app-environment: &app-environment
   PLATFORM_ACTOR_ADAPTER: laravel-auth
   PLATFORM_COMPLETION_ADAPTER: ${PLATFORM_COMPLETION_ADAPTER:-deterministic-fake}
 
+x-restore-environment: &restore-environment
+  <<: *app-environment
+  APP_URL: http://localhost:18080
+  DB_HOST: postgres-restore
+  DB_DATABASE: tapoda_restore
+  REDIS_HOST: redis-restore
+  HORIZON_PREFIX: tapoda_restore_horizon
+
 x-app: &app
   image: tapoda-next:${APP_BUILD_VERSION:-local}
   build:
@@ -43,6 +51,16 @@ x-app: &app
     redis:
       condition: service_healthy
   restart: unless-stopped
+
+x-restore-app: &restore-app
+  <<: *app
+  profiles: ["restore"]
+  environment: *restore-environment
+  depends_on:
+    postgres-restore:
+      condition: service_healthy
+    redis-restore:
+      condition: service_healthy
 
 services:
   web:
@@ -93,8 +111,54 @@ services:
     healthcheck:
       disable: true
 
+  restore-web:
+    <<: *restore-app
+    ports:
+      - "18080:8080"
+
+  restore-worker:
+    <<: *restore-app
+    command: ["php", "artisan", "horizon"]
+    healthcheck:
+      disable: true
+
+  restore-scheduler:
+    <<: *restore-app
+    command: ["php", "artisan", "schedule:work"]
+    healthcheck:
+      disable: true
+
+  restore-migrate:
+    <<: *restore-app
+    command: ["php", "artisan", "migrate", "--force"]
+    restart: "no"
+    healthcheck:
+      disable: true
+
+  restore-test:
+    build:
+      context: .
+      target: test
+    profiles: ["restore"]
+    environment:
+      <<: *restore-environment
+      APP_ENV: testing
+      APP_DEBUG: "true"
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+      PLATFORM_ACTOR_ADAPTER: test-header
+      PLATFORM_COMPLETION_ADAPTER: deterministic-fake
+    depends_on:
+      postgres-restore:
+        condition: service_healthy
+      redis-restore:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
   postgres:
-    image: postgres:18-bookworm
+    image: postgres:18-bookworm@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-tapoda}
       POSTGRES_USER: ${POSTGRES_USER:-tapoda}
@@ -107,8 +171,33 @@ services:
       timeout: 3s
       retries: 20
 
+  postgres-restore:
+    image: postgres:18-bookworm@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296
+    profiles: ["restore"]
+    environment:
+      POSTGRES_DB: tapoda_restore
+      POSTGRES_USER: ${POSTGRES_USER:-tapoda}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run bin/bootstrap-env first}
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   redis:
-    image: redis:8.4-bookworm
+    image: redis:8.4-bookworm@sha256:c22af04bb576503bf16b3e34a1fd2fd82de0f765afd866d2e380145e0af30d78
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis-restore:
+    image: redis:8.4-bookworm@sha256:c22af04bb576503bf16b3e34a1fd2fd82de0f765afd866d2e380145e0af30d78
+    profiles: ["restore"]
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]

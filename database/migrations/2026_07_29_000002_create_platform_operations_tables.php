@@ -10,7 +10,8 @@ return new class extends Migration
     {
         Schema::create('platform_probe_runs', function (Blueprint $table): void {
             $table->uuid('id')->primary();
-            $table->string('idempotency_key', 128)->unique();
+            $table->string('idempotency_key', 128);
+            $table->string('actor_type', 64);
             $table->string('actor_id', 128);
             $table->uuid('correlation_id')->unique();
             $table->string('status', 32);
@@ -19,6 +20,11 @@ return new class extends Migration
             $table->timestampTz('queued_at');
             $table->timestampTz('completed_at')->nullable();
             $table->timestampsTz();
+
+            $table->unique(
+                ['actor_type', 'actor_id', 'idempotency_key'],
+                'platform_probe_actor_idempotency_unique',
+            );
         });
 
         Schema::create('outbox_events', function (Blueprint $table): void {

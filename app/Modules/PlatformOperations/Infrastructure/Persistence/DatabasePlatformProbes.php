@@ -28,6 +28,8 @@ final readonly class DatabasePlatformProbes implements PlatformProbes
 
         $existing = $this->database
             ->table('platform_probe_runs')
+            ->where('actor_type', $actor->type)
+            ->where('actor_id', $actor->id)
             ->where('idempotency_key', $idempotencyKey)
             ->first();
 
@@ -44,6 +46,7 @@ final readonly class DatabasePlatformProbes implements PlatformProbes
             $inserted = $this->database->table('platform_probe_runs')->insertOrIgnore([
                 'id' => $probeId,
                 'idempotency_key' => $idempotencyKey,
+                'actor_type' => $actor->type,
                 'actor_id' => $actor->id,
                 'correlation_id' => $correlationId,
                 'status' => 'queued',
@@ -58,6 +61,8 @@ final readonly class DatabasePlatformProbes implements PlatformProbes
             if ($inserted === 0) {
                 $existing = $this->database
                     ->table('platform_probe_runs')
+                    ->where('actor_type', $actor->type)
+                    ->where('actor_id', $actor->id)
                     ->where('idempotency_key', $idempotencyKey)
                     ->firstOrFail();
 
@@ -105,7 +110,12 @@ final readonly class DatabasePlatformProbes implements PlatformProbes
     {
         $this->authorize($actor);
 
-        $run = $this->database->table('platform_probe_runs')->find($probeId);
+        $run = $this->database
+            ->table('platform_probe_runs')
+            ->where('id', $probeId)
+            ->where('actor_type', $actor->type)
+            ->where('actor_id', $actor->id)
+            ->first();
 
         return $run === null ? null : $this->view($run);
     }
