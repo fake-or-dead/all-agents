@@ -21,7 +21,7 @@ Produce approved fixtures and matrices for every report, export, print, email, d
 
 ## Local completion record
 
-2026-07-29 — [Local output, communication, document, and device contracts](../../../docs/decisions/local/output-device-contracts.md), [synthetic fixture](../../../docs/decisions/local/output-device-fixtures.json), and [deterministic validator](../../../docs/decisions/local/validate-local-contract-fixtures.mjs) define executable local defaults. The validator computes membership, values, parity, Thai ordering, Buddhist dates, totals, pagination, redaction, and authorization. Production owner signoff remains excluded.
+2026-07-29 — [Local output, communication, document, and device contracts](../../../docs/decisions/local/output-device-contracts.md), [synthetic fixture](../../../docs/decisions/local/output-device-fixtures.json), and [deterministic validator](../../../docs/decisions/local/validate-local-contract-fixtures.mjs) define executable local defaults. The validator computes seniority/category ordering, derived teacher groups, independent golden values, sensitive redaction, and Thai-ID verification/atomic replay handling. Production owner signoff remains excluded.
 
 ## Blocked by
 

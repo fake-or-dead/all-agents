@@ -18,7 +18,7 @@ Define least-privilege access for every actor, action, center, course session, r
 
 ## Local completion record
 
-2026-07-29 — [Local RBAC and privacy contract](../../../docs/decisions/local/rbac-privacy.md) defines executable local defaults, including independently denied/redacted `medication.read`, `medication.print`, `medication.export`, `national_id.masked_read`, and deny-only `national_id.full_read`. Production legal/privacy approval is explicitly excluded.
+2026-07-29 — [Local RBAC and privacy contract](../../../docs/decisions/local/rbac-privacy.md) defines executable local defaults, including separate emergency/health/medication read-print-export grants, mental-health/substance-use read-export grants with print always omitted, `national_id.masked_read`, and deny-only `national_id.full_read`. Production legal/privacy approval is explicitly excluded.
 
 ## Blocked by
 

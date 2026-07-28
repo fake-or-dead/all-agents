@@ -5,7 +5,7 @@
     "spec_version": "tapoda-output-v2",
     "timezone": "Asia/Bangkok",
     "date_rule": {"input": "YYYY-MM-DD", "output": "dd/MM/BBBB", "ce_to_be_offset": 543},
-    "sort_rule": {"normalization": "NFC_trim_collapse_spaces", "locale": "th", "options": {"usage": "sort", "sensitivity": "base", "ignorePunctuation": true, "numeric": true}, "keys": ["thai_name", "application_id"]},
+    "sort_rule": {"normalization": "NFC_trim_collapse_spaces", "locale": "th", "options": {"usage": "sort", "sensitivity": "base", "ignorePunctuation": true, "numeric": true}, "applicant_keys": ["seniority", "thai_name", "application_id"], "seniority_direction": "ascending", "laundry_keys": ["approved_category", "room", "thai_name", "laundry_id"]},
     "applicant": {
       "states": {"include": ["submitted", "under_review", "invited", "confirmed", "checked_in", "completed"], "exclude": ["draft", "withdrawn", "declined_invitation", "rejected"]},
       "unknown_persona": "exclude_and_audit_unknown_persona",
@@ -21,13 +21,14 @@
       ],
       "fields": [
         {"key": "application_id", "label_th": "รหัสใบสมัคร"},
+        {"key": "seniority", "label_th": "ลำดับอาวุโส"},
         {"key": "thai_name", "label_th": "ชื่อ - นามสกุล"},
         {"key": "classification", "label_th": "ประเภทผู้สมัคร"},
         {"key": "state", "label_th": "สถานะใบสมัคร"},
         {"key": "submitted_at", "label_th": "วันที่ส่งใบสมัคร", "format": "buddhist_date"},
         {"key": "confirmed_at", "label_th": "วันที่ยืนยัน", "format": "buddhist_date"},
-        {"key": "mental_health", "label_th": "ข้อมูลสุขภาพจิต", "capabilities": {"screen": "mental_health.read", "print": "mental_health.print", "xlsx": "mental_health.export"}},
-        {"key": "substance_use", "label_th": "ข้อมูลสารเสพติด", "capabilities": {"screen": "substance_use.read", "print": "substance_use.print", "xlsx": "substance_use.export"}},
+        {"key": "mental_health", "label_th": "ข้อมูลสุขภาพจิต", "surface_policy": {"print": "always_omit"}, "capabilities": {"screen": "mental_health.read", "xlsx": "mental_health.export"}},
+        {"key": "substance_use", "label_th": "ข้อมูลสารเสพติด", "surface_policy": {"print": "always_omit"}, "capabilities": {"screen": "substance_use.read", "xlsx": "substance_use.export"}},
         {"key": "health_summary", "label_th": "ข้อมูลสุขภาพ", "capabilities": {"screen": "health.read", "print": "health.print", "xlsx": "health.export"}},
         {"key": "medication_summary", "label_th": "ยา", "capabilities": {"screen": "medication.read", "print": "medication.print", "xlsx": "medication.export"}},
         {"key": "emergency_contact", "label_th": "ผู้ติดต่อฉุกเฉิน", "capabilities": {"screen": "emergency_contact.read", "print": "emergency_contact.print", "xlsx": "emergency_contact.export"}},
@@ -47,11 +48,11 @@
       "page_size": 5,
       "max_print_selection": 10,
       "groups": [
-        {"id": "old_men", "label_th": "ศิษย์เก่าชาย", "persona": "alumni", "gender": "male"},
-        {"id": "new_men", "label_th": "ศิษย์ใหม่ชาย", "persona": "new", "gender": "male"},
-        {"id": "old_women", "label_th": "ศิษย์เก่าหญิง", "persona": "alumni", "gender": "female"},
-        {"id": "new_women", "label_th": "ศิษย์ใหม่หญิง", "persona": "new", "gender": "female"},
-        {"id": "staff", "label_th": "ธรรมบริกร", "persona": "staff", "gender": "any"}
+        {"id": "old_men", "label_th": "ศิษย์เก่าชาย", "persona": "alumni", "gender": "male", "category": "trainee"},
+        {"id": "new_men", "label_th": "ศิษย์ใหม่ชาย", "persona": "new", "gender": "male", "category": "trainee"},
+        {"id": "old_women", "label_th": "ศิษย์เก่าหญิง", "persona": "alumni", "gender": "female", "category": "trainee"},
+        {"id": "new_women", "label_th": "ศิษย์ใหม่หญิง", "persona": "new", "gender": "female", "category": "trainee"},
+        {"id": "staff", "label_th": "ธรรมบริกร", "persona": "staff", "gender": "any", "category": "staff"}
       ],
       "fields": [
         {"key": "application_id", "label_th": "รหัสใบสมัคร"}, {"key": "thai_name", "label_th": "ชื่อ - นามสกุล"},
@@ -61,14 +62,15 @@
         {"key": "dinner", "label_th": "อาหารเย็น"}, {"key": "seating", "label_th": "ที่นั่ง"}, {"key": "special_requests", "label_th": "คำขอพิเศษ"},
         {"key": "health_summary", "label_th": "ข้อมูลสุขภาพ", "capabilities": {"screen": "health.read", "print": "health.print"}},
         {"key": "medication_summary", "label_th": "ยา", "capabilities": {"screen": "medication.read", "print": "medication.print"}},
+        {"key": "emergency_contact", "label_th": "ผู้ติดต่อฉุกเฉิน", "capabilities": {"screen": "emergency_contact.read", "print": "emergency_contact.print"}},
         {"key": "mental_health", "label_th": "ข้อมูลสุขภาพจิต", "policy": "always_omit"},
         {"key": "substance_use", "label_th": "ข้อมูลสารเสพติด", "policy": "always_omit"}
       ]
     },
     "laundry": {
-      "label_th": "ใบส่งซักผ้า", "states": ["confirmed", "checked_in", "completed"],
+      "label_th": "ใบส่งซักผ้า", "states": ["confirmed", "checked_in", "completed"], "approved_categories": ["trainee", "monastic", "staff"],
       "fields": [
-        {"key": "room", "label_th": "เลขห้อง"}, {"key": "thai_name", "label_th": "ชื่อ - นามสกุล"},
+        {"key": "approved_category", "label_th": "กลุ่มที่อนุมัติ"}, {"key": "room", "label_th": "เลขห้อง"}, {"key": "thai_name", "label_th": "ชื่อ - นามสกุล"},
         {"key": "day_01", "label_th": "01"}, {"key": "day_02", "label_th": "02"}, {"key": "day_03", "label_th": "03"}, {"key": "day_04", "label_th": "04"},
         {"key": "day_05", "label_th": "05"}, {"key": "day_06", "label_th": "06"}, {"key": "day_07", "label_th": "07"}, {"key": "day_08", "label_th": "08"},
         {"key": "laundry_cost", "label_th": "ค่าซักผ้า"}, {"key": "purchase_cost", "label_th": "ค่าซื้อของ"}, {"key": "total", "label_th": "รวม"},
@@ -77,6 +79,9 @@
     }
   },
   "synthetic_records": {
+    "application_seniority": {"app-001":1,"app-002":20,"app-003":2,"app-004":3,"app-005":1,"app-006":1,"app-007":4,"app-008":5,"app-014":10,"app-015":10,"app-016":5},
+    "application_categories": {"app-001":"trainee","app-002":"trainee","app-003":"trainee","app-004":"trainee","app-005":"monastic","app-006":"monastic","app-007":"staff","app-008":"staff","app-014":"trainee","app-015":"trainee","app-016":"trainee"},
+    "laundry_approved_categories": {"laundry-004":"trainee","laundry-006":"monastic","laundry-101":"staff","laundry-102":"trainee","laundry-103":"trainee","laundry-104":"trainee"},
     "applications": [
       {"application_id":"app-001","thai_name":"กานดา ใจดี","persona":"alumni","gender":"male","state":"submitted","classification":"ศิษย์เก่า","submitted_at":"2026-01-01","confirmed_at":null,"mental_health":"ปกติ-สังเคราะห์","substance_use":"ไม่มี-สังเคราะห์","health_summary":"สุขภาพทั่วไป-สังเคราะห์","medication_summary":"ยาสังเคราะห์ A","emergency_contact":"ผู้ติดต่อสังเคราะห์ 01","history":"ประวัติสังเคราะห์ 01","training":"10 วัน","attendance_period":"เต็มเวลา","checked_in_at":null,"completed_at":null,"dinner":"ไม่รับ","seating":"ปกติ","special_requests":"ไม่มี","room":"A01"},
       {"application_id":"app-002","thai_name":"กานต์ ดีงาม","persona":"new","gender":"male","state":"under_review","classification":"ศิษย์ใหม่","submitted_at":"2026-01-02","confirmed_at":null,"mental_health":"ปกติ-สังเคราะห์","substance_use":"ไม่มี-สังเคราะห์","health_summary":"สุขภาพทั่วไป-สังเคราะห์","medication_summary":"ยาสังเคราะห์ B","emergency_contact":"ผู้ติดต่อสังเคราะห์ 02","history":"ประวัติสังเคราะห์ 02","training":"ครั้งแรก","attendance_period":"เต็มเวลา","checked_in_at":null,"completed_at":null,"dinner":"รับ","seating":"เก้าอี้","special_requests":"สังเคราะห์ 02","room":"A02"},
@@ -106,17 +111,32 @@
       {"teacher_record_id":"teacher-08","application_id":"app-008","thai_name":"ซอ สังเคราะห์","group_id":"staff","state":"confirmed"},
       {"teacher_record_id":"teacher-09","application_id":"app-003","thai_name":"ดอ สังเคราะห์","group_id":"old_women","state":"checked_in"},
       {"teacher_record_id":"teacher-10","application_id":"app-004","thai_name":"ตอ สังเคราะห์","group_id":"new_women","state":"completed"},
-      {"teacher_record_id":"teacher-11","application_id":"app-007","thai_name":"ทอ สังเคราะห์","group_id":"staff","state":"invited"}
+      {"teacher_record_id":"teacher-11","application_id":"app-007","thai_name":"ทอ สังเคราะห์","group_id":"staff","state":"invited"},
+      {"teacher_record_id":"teacher-12","application_id":"app-003","thai_name":"ธอ สังเคราะห์","group_id":"new_men","state":"invited"}
     ],
     "laundry_records": [
       {"laundry_id":"laundry-004","application_id":"app-004","thai_name":"จันทร์เพ็ญ สงบ","room":"B02","day_01":1,"day_02":0,"day_03":1,"day_04":0,"day_05":1,"day_06":0,"day_07":0,"day_08":0,"laundry_cost":80,"purchase_cost":20,"facility_need":"เก้าอี้"},
-      {"laundry_id":"laundry-006","application_id":"app-006","thai_name":"ภิกษุณีสังเคราะห์ หนึ่ง","room":"N01","day_01":0,"day_02":1,"day_03":0,"day_04":1,"day_05":0,"day_06":0,"day_07":0,"day_08":0,"laundry_cost":50,"purchase_cost":0,"facility_need":"ไม่มี"}
+      {"laundry_id":"laundry-006","application_id":"app-006","thai_name":"ภิกษุณีสังเคราะห์ หนึ่ง","room":"N01","day_01":0,"day_02":1,"day_03":0,"day_04":1,"day_05":0,"day_06":0,"day_07":0,"day_08":0,"laundry_cost":50,"purchase_cost":0,"facility_need":"ไม่มี"},
+      {"laundry_id":"laundry-101","application_id":"app-004","thai_name":"กอ งานผ้า","room":"A01","day_01":0,"day_02":0,"day_03":0,"day_04":0,"day_05":0,"day_06":0,"day_07":0,"day_08":0,"laundry_cost":10,"purchase_cost":0,"facility_need":"ไม่มี"},
+      {"laundry_id":"laundry-102","application_id":"app-004","thai_name":"กอ งานผ้า","room":"Z99","day_01":0,"day_02":0,"day_03":0,"day_04":0,"day_05":0,"day_06":0,"day_07":0,"day_08":0,"laundry_cost":20,"purchase_cost":0,"facility_need":"ไม่มี"},
+      {"laundry_id":"laundry-103","application_id":"app-004","thai_name":"ขอ งานผ้า","room":"A01","day_01":0,"day_02":0,"day_03":0,"day_04":0,"day_05":0,"day_06":0,"day_07":0,"day_08":0,"laundry_cost":30,"purchase_cost":0,"facility_need":"ไม่มี"},
+      {"laundry_id":"laundry-104","application_id":"app-004","thai_name":"ขอ งานผ้า","room":"A01","day_01":0,"day_02":0,"day_03":0,"day_04":0,"day_05":0,"day_06":0,"day_07":0,"day_08":0,"laundry_cost":40,"purchase_cost":0,"facility_need":"ไม่มี"}
     ]
   },
   "fixtures": [
     {"id":"zero_rows","spec_version":"tapoda-output-v2","course_session_id":"session-synthetic-001","requester":"reporter-zero","authorization_result":"allowed","generated_at":"2026-07-29T00:00:00Z","input":{"application_ids":[],"teacher_record_ids":[],"laundry_ids":[]},"expected":{"applicant":{"screen":{"alumni_male":[],"new_male":[],"alumni_female":[],"new_female":[],"monk":[],"nun":[],"staff_male":[],"staff_female":[]},"counters":{"alumni_male":0,"new_male":0,"alumni_female":0,"new_female":0,"monk":0,"nun":0,"staff_male":0,"staff_female":0},"print":"same_as_screen","xlsx":"same_as_screen"},"teacher":{"screen":{"old_men":[],"new_men":[],"old_women":[],"new_women":[],"staff":[]},"counters":{"old_men":0,"new_men":0,"old_women":0,"new_women":0,"staff":0},"print":"same_as_screen"},"laundry":{"screen":[],"counter":0,"print":[],"xlsx":[],"total":0}}},
     {"id":"boundary_states_groups","spec_version":"tapoda-output-v2","course_session_id":"session-synthetic-001","requester":"reporter-boundary","authorization_result":"allowed","generated_at":"2026-07-29T00:01:00Z","input":{"application_ids":["app-001","app-002","app-003","app-004","app-005","app-006","app-007","app-008","app-009","app-010","app-011","app-012","app-013"],"teacher_record_ids":["teacher-01","teacher-02","teacher-03","teacher-04"],"laundry_ids":["laundry-004","laundry-006"]},"expected":{"applicant":{"screen":{"alumni_male":["app-001"],"new_male":["app-002"],"alumni_female":["app-003"],"new_female":["app-004"],"monk":["app-005"],"nun":["app-006"],"staff_male":["app-007"],"staff_female":["app-008"]},"counters":{"alumni_male":1,"new_male":1,"alumni_female":1,"new_female":1,"monk":1,"nun":1,"staff_male":1,"staff_female":1},"print":"same_as_screen","xlsx":"same_as_screen","audits":["unknown_persona:app-013"]},"teacher":{"screen":{"old_men":[],"new_men":[],"old_women":["teacher-01"],"new_women":["teacher-02"],"staff":["teacher-03","teacher-04"]},"counters":{"old_men":0,"new_men":0,"old_women":1,"new_women":1,"staff":2},"print":"same_as_screen"},"laundry":{"screen":["laundry-004","laundry-006"],"counter":2,"print":["laundry-004","laundry-006"],"xlsx":["laundry-004","laundry-006"],"row_totals":{"laundry-004":100,"laundry-006":50},"total":150}}},
-    {"id":"thai_ordering","spec_version":"tapoda-output-v2","course_session_id":"session-synthetic-001","requester":"reporter-sort","authorization_result":"allowed","generated_at":"2026-07-29T00:02:00Z","input":{"application_ids":["app-016","app-015","app-014","app-002"]},"expected":{"normalized_names":{"app-002":"กานต์ ดีงาม","app-014":"กานต์ ดีงาม"},"new_male_order":["app-002","app-014","app-015","app-016"],"tie_break":"application_id"}},
+    {"id":"thai_ordering","spec_version":"tapoda-output-v2","course_session_id":"session-synthetic-001","requester":"reporter-sort","authorization_result":"allowed","generated_at":"2026-07-29T00:02:00Z","input":{"application_ids":["app-016","app-015","app-014","app-002"]},"expected":{"normalized_names":{"app-002":"กานต์ ดีงาม","app-014":"กานต์ ดีงาม"},"new_male_order":["app-016","app-014","app-015","app-002"],"sort_keys":["seniority","thai_name","application_id"],"tie_break":"application_id"}},
+    {"id":"laundry_ordering_conflicts","spec_version":"tapoda-output-v2","course_session_id":"session-synthetic-001","requester":"operations-sort","authorization_result":"allowed","generated_at":"2026-07-29T00:02:30Z","input":{"laundry_ids":["laundry-101","laundry-006","laundry-102","laundry-104","laundry-103"]},"expected":{"order":["laundry-103","laundry-104","laundry-102","laundry-006","laundry-101"],"sort_keys":["approved_category","room","thai_name","laundry_id"]}},
+    {"id":"teacher_conflicting_classification","spec_version":"tapoda-output-v2","course_session_id":"session-synthetic-001","requester":"teacher-reviewer","authorization_result":"rejected_classification_conflict","generated_at":"2026-07-29T00:02:40Z","input":{"teacher_record_ids":["teacher-12"]},"expected":{"screen":{"old_men":[],"new_men":[],"old_women":[],"new_women":[],"staff":[]},"audits":["classification_conflict:teacher-12:supplied=new_men:derived=old_women"]}},
+    {"id":"independent_expected_values","spec_version":"tapoda-output-v2","course_session_id":"session-synthetic-001","requester":"cross-review-golden","authorization_result":"allowed","generated_at":"2026-07-29T00:02:50Z","input":{"application_id":"app-001","teacher_record_id":"teacher-01","laundry_id":"laundry-004"},"expected":{"applicant":{"counter":{"alumni_male":1},"screen":{"application_id":"app-001","seniority":1,"thai_name":"กานดา ใจดี","classification":"ศิษย์เก่า","state":"submitted","submitted_at":"01/01/2569","confirmed_at":null,"mental_health":"ปกติ-สังเคราะห์","substance_use":"ไม่มี-สังเคราะห์","health_summary":"สุขภาพทั่วไป-สังเคราะห์","medication_summary":"ยาสังเคราะห์ A","emergency_contact":"ผู้ติดต่อสังเคราะห์ 01","history":"ประวัติสังเคราะห์ 01","training":"10 วัน","attendance_period":"เต็มเวลา","checked_in_at":null,"completed_at":null,"dinner":"ไม่รับ","seating":"ปกติ","special_requests":"ไม่มี","room":"A01"},"print":{"application_id":"app-001","seniority":1,"thai_name":"กานดา ใจดี","classification":"ศิษย์เก่า","state":"submitted","submitted_at":"01/01/2569","confirmed_at":null,"health_summary":"สุขภาพทั่วไป-สังเคราะห์","medication_summary":"ยาสังเคราะห์ A","emergency_contact":"ผู้ติดต่อสังเคราะห์ 01","history":"ประวัติสังเคราะห์ 01","training":"10 วัน","attendance_period":"เต็มเวลา","checked_in_at":null,"completed_at":null,"dinner":"ไม่รับ","seating":"ปกติ","special_requests":"ไม่มี","room":"A01"},"xlsx":{"application_id":"app-001","seniority":1,"thai_name":"กานดา ใจดี","classification":"ศิษย์เก่า","state":"submitted","submitted_at":"01/01/2569","confirmed_at":null,"mental_health":"ปกติ-สังเคราะห์","substance_use":"ไม่มี-สังเคราะห์","health_summary":"สุขภาพทั่วไป-สังเคราะห์","medication_summary":"ยาสังเคราะห์ A","emergency_contact":"ผู้ติดต่อสังเคราะห์ 01","history":"ประวัติสังเคราะห์ 01","training":"10 วัน","attendance_period":"เต็มเวลา","checked_in_at":null,"completed_at":null,"dinner":"ไม่รับ","seating":"ปกติ","special_requests":"ไม่มี","room":"A01"}},"teacher":{"print":{"application_id":"app-003","thai_name":"กอ สังเคราะห์","classification":"ศิษย์เก่า","history":"ประวัติสังเคราะห์ 03","training":"10 วัน","attendance_period":"เต็มเวลา","checked_in_at":null,"completed_at":null,"dinner":"รับ","seating":"พื้น","special_requests":"สังเคราะห์ 03","health_summary":"สุขภาพทั่วไป-สังเคราะห์","medication_summary":"ยาสังเคราะห์ C","emergency_contact":"ผู้ติดต่อสังเคราะห์ 03"}},"laundry":{"screen":{"approved_category":"trainee","room":"B02","thai_name":"จันทร์เพ็ญ สงบ","day_01":1,"day_02":0,"day_03":1,"day_04":0,"day_05":1,"day_06":0,"day_07":0,"day_08":0,"laundry_cost":80,"purchase_cost":20,"total":100,"facility_need":"เก้าอี้"},"print":"same_as_screen","xlsx":"same_as_screen"}}},
+    {"id":"sensitive_field_matrix","spec_version":"tapoda-output-v2","course_session_id":"session-synthetic-001","requester":"privacy-test","authorization_result":"allowed_and_redacted_cases","generated_at":"2026-07-29T00:02:55Z","input":{"application_id":"app-001"},"expected":{"fields":[
+      {"key":"mental_health","value":"ปกติ-สังเคราะห์","screen":{"capability":"mental_health.read","authorized":"value","denied":"redacted"},"print":{"capability":null,"authorized":"always_omit","denied":"always_omit"},"xlsx":{"capability":"mental_health.export","authorized":"value","denied":"redacted"}},
+      {"key":"substance_use","value":"ไม่มี-สังเคราะห์","screen":{"capability":"substance_use.read","authorized":"value","denied":"redacted"},"print":{"capability":null,"authorized":"always_omit","denied":"always_omit"},"xlsx":{"capability":"substance_use.export","authorized":"value","denied":"redacted"}},
+      {"key":"health_summary","value":"สุขภาพทั่วไป-สังเคราะห์","screen":{"capability":"health.read","authorized":"value","denied":"redacted"},"print":{"capability":"health.print","authorized":"value","denied":"redacted"},"xlsx":{"capability":"health.export","authorized":"value","denied":"redacted"}},
+      {"key":"medication_summary","value":"ยาสังเคราะห์ A","screen":{"capability":"medication.read","authorized":"value","denied":"redacted"},"print":{"capability":"medication.print","authorized":"value","denied":"redacted"},"xlsx":{"capability":"medication.export","authorized":"value","denied":"redacted"}},
+      {"key":"emergency_contact","value":"ผู้ติดต่อสังเคราะห์ 01","screen":{"capability":"emergency_contact.read","authorized":"value","denied":"redacted"},"print":{"capability":"emergency_contact.print","authorized":"value","denied":"redacted"},"xlsx":{"capability":"emergency_contact.export","authorized":"value","denied":"redacted"}}
+    ],"teacher_emergency_contact":{"teacher_record_id":"teacher-01","value":"ผู้ติดต่อสังเคราะห์ 03","screen_capability":"emergency_contact.read","print_capability":"emergency_contact.print","denied":"redacted"}}},
     {"id":"teacher_selection_0","spec_version":"tapoda-output-v2","course_session_id":"session-synthetic-001","requester":"teacher-print","authorization_result":"allowed","generated_at":"2026-07-29T00:03:00Z","input":{"teacher_record_ids":[]},"expected":{"selected":0,"allowed":true,"pages":0,"print":[]}},
     {"id":"teacher_selection_1","spec_version":"tapoda-output-v2","course_session_id":"session-synthetic-001","requester":"teacher-print","authorization_result":"allowed","generated_at":"2026-07-29T00:04:00Z","input":{"teacher_record_ids":["teacher-01"]},"expected":{"selected":1,"allowed":true,"pages":1,"print":["teacher-01"]}},
     {"id":"teacher_selection_10_pagination","spec_version":"tapoda-output-v2","course_session_id":"session-synthetic-001","requester":"teacher-print","authorization_result":"allowed","generated_at":"2026-07-29T00:05:00Z","input":{"teacher_record_ids":["teacher-01","teacher-02","teacher-03","teacher-04","teacher-05","teacher-06","teacher-07","teacher-08","teacher-09","teacher-10"]},"expected":{"selected":10,"allowed":true,"pages":2,"page_size":5,"print":["teacher-01","teacher-02","teacher-03","teacher-04","teacher-05","teacher-06","teacher-07","teacher-08","teacher-09","teacher-10"]}},
@@ -145,5 +165,25 @@
     "disabled_variants":[{"id":"email_2","enabled":false,"status":"template_unresolved","recipient":null,"sender":null,"assets":[],"course":null,"template":null,"links":[],"attachment":"none"}],
     "fixture_events":["queued","sent","failed_retry_1","failed_retry_2","failed_terminal","bounced"]
   },
-  "thai_id":{"challenge_claims":["iss","kid","jti","nonce","actor_account_id","session_id","action","course_session_id","aud","origin","exp"],"required_values":{"action":"identity.verify","aud":"tapoda-thai-id-companion","origin":"https://tapoda.local"},"consume":"atomic_jti_and_nonce_before_verification_event","rejections":["unknown_issuer","unknown_kid","bad_signature","expired","audience_mismatch","action_mismatch","origin_mismatch","actor_mismatch","session_mismatch","course_session_mismatch","jti_mismatch","nonce_mismatch","already_consumed"],"audit_outcome":"rejected_without_card_data"}
+  "thai_id": {
+    "challenge_claims":["iss","kid","jti","nonce","actor_account_id","session_id","action","course_session_id","aud","origin","exp"],
+    "verifier":{"trusted_issuer":"tapoda-local","trusted_keys":{"kid-local-1":"synthetic-public-key"},"valid_signature":"sig-valid","now":"2026-07-29T00:00:00Z","required_values":{"action":"identity.verify","aud":"tapoda-thai-id-companion","origin":"https://tapoda.local"}},
+    "consume":"atomic_jti_and_nonce_before_verification_event",
+    "cases":[
+      {"id":"valid","challenge_overrides":{"jti":"jti-valid","nonce":"nonce-valid"},"assertion_overrides":{"jti":"jti-valid","nonce":"nonce-valid"},"expected":{"decision":"accepted","reason":"verified","audit":{"outcome":"accepted","reason":"verified","correlation_id":"thai-id-valid"}}},
+      {"id":"unknown_issuer","challenge_overrides":{"iss":"unknown-local"},"expected":{"decision":"rejected","reason":"unknown_issuer","audit":{"outcome":"rejected","reason":"unknown_issuer","correlation_id":"thai-id-unknown_issuer"}}},
+      {"id":"unknown_kid","challenge_overrides":{"kid":"kid-unknown"},"expected":{"decision":"rejected","reason":"unknown_kid","audit":{"outcome":"rejected","reason":"unknown_kid","correlation_id":"thai-id-unknown_kid"}}},
+      {"id":"invalid_signature","assertion_overrides":{"signature":"sig-invalid"},"expected":{"decision":"rejected","reason":"bad_signature","audit":{"outcome":"rejected","reason":"bad_signature","correlation_id":"thai-id-invalid_signature"}}},
+      {"id":"expired","challenge_overrides":{"exp":"2026-07-28T23:59:59Z"},"expected":{"decision":"rejected","reason":"expired","audit":{"outcome":"rejected","reason":"expired","correlation_id":"thai-id-expired"}}},
+      {"id":"audience_mismatch","assertion_overrides":{"aud":"wrong-audience"},"expected":{"decision":"rejected","reason":"audience_mismatch","audit":{"outcome":"rejected","reason":"audience_mismatch","correlation_id":"thai-id-audience_mismatch"}}},
+      {"id":"action_mismatch","assertion_overrides":{"action":"identity.read"},"expected":{"decision":"rejected","reason":"action_mismatch","audit":{"outcome":"rejected","reason":"action_mismatch","correlation_id":"thai-id-action_mismatch"}}},
+      {"id":"origin_mismatch","assertion_overrides":{"origin":"https://wrong.invalid"},"expected":{"decision":"rejected","reason":"origin_mismatch","audit":{"outcome":"rejected","reason":"origin_mismatch","correlation_id":"thai-id-origin_mismatch"}}},
+      {"id":"actor_mismatch","assertion_overrides":{"actor_account_id":"actor-other"},"expected":{"decision":"rejected","reason":"actor_mismatch","audit":{"outcome":"rejected","reason":"actor_mismatch","correlation_id":"thai-id-actor_mismatch"}}},
+      {"id":"session_mismatch","assertion_overrides":{"session_id":"session-other"},"expected":{"decision":"rejected","reason":"session_mismatch","audit":{"outcome":"rejected","reason":"session_mismatch","correlation_id":"thai-id-session_mismatch"}}},
+      {"id":"course_mismatch","assertion_overrides":{"course_session_id":"course-other"},"expected":{"decision":"rejected","reason":"course_session_mismatch","audit":{"outcome":"rejected","reason":"course_session_mismatch","correlation_id":"thai-id-course_mismatch"}}},
+      {"id":"jti_mismatch","assertion_overrides":{"jti":"jti-other"},"expected":{"decision":"rejected","reason":"jti_mismatch","audit":{"outcome":"rejected","reason":"jti_mismatch","correlation_id":"thai-id-jti_mismatch"}}},
+      {"id":"nonce_mismatch","assertion_overrides":{"nonce":"nonce-other"},"expected":{"decision":"rejected","reason":"nonce_mismatch","audit":{"outcome":"rejected","reason":"nonce_mismatch","correlation_id":"thai-id-nonce_mismatch"}}},
+      {"id":"replay","challenge_overrides":{"jti":"jti-valid","nonce":"nonce-valid"},"assertion_overrides":{"jti":"jti-valid","nonce":"nonce-valid"},"expected":{"decision":"rejected","reason":"already_consumed","audit":{"outcome":"rejected","reason":"already_consumed","correlation_id":"thai-id-replay"}}}
+    ]
+  }
 }
