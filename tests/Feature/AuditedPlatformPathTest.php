@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Modules\PlatformOperations\Contracts\CompletionAdapter;
 use App\Modules\PlatformOperations\Contracts\PlatformProbeWorker;
 use App\Modules\PlatformOperations\Infrastructure\Completion\StructuredLogCompletionAdapter;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Mockery;
@@ -252,6 +253,120 @@ final class AuditedPlatformPathTest extends TestCase
 
         $this->assertSame(2, $deliveryAttempts);
         $this->assertCount(1, $effectiveDeliveries);
+    }
+
+    public function test_completion_effect_retries_with_same_key_after_delivered_state_failure(): void
+    {
+        $effectAttempts = [];
+        $effectiveDeliveries = [];
+        $logger = Mockery::mock(LoggerInterface::class);
+        $logger
+            ->shouldReceive('info')
+            ->twice()
+            ->with('Platform probe completed.', Mockery::on(
+                fn (array $context): bool => isset(
+                    $context['probe_id'],
+                    $context['correlation_id'],
+                    $context['delivery_key'],
+                ),
+            ))
+            ->andReturnUsing(function (string $message, array $context) use (
+                &$effectAttempts,
+                &$effectiveDeliveries,
+            ): void {
+                $effectAttempts[] = $context['delivery_key'];
+                $effectiveDeliveries[$context['delivery_key']] = $message;
+            });
+        $adapter = new StructuredLogCompletionAdapter(DB::connection(), $logger);
+        $this->app->instance(CompletionAdapter::class, $adapter);
+
+        $accepted = $this
+            ->withHeaders([
+                'Idempotency-Key' => 'probe-20260729-crash-window',
+                'X-Tapoda-Test-Actor' => 'platform-operator',
+            ])
+            ->postJson('/platform/probes')
+            ->assertAccepted();
+        $probe = DB::table('platform_probe_runs')->find($accepted->json('data.id'));
+        $outbox = DB::table('outbox_events')->where('aggregate_id', $probe->id)->first();
+        $failDeliveredPersistence = true;
+
+        DB::listen(function (QueryExecuted $query) use (&$failDeliveredPersistence): void {
+            if (
+                $failDeliveredPersistence
+                && str_starts_with(strtolower($query->sql), 'update')
+                && str_contains($query->sql, 'platform_completion_receipts')
+                && in_array('delivered', $query->bindings, true)
+            ) {
+                $failDeliveredPersistence = false;
+
+                throw new RuntimeException(
+                    'Injected failure after effect before delivered-state commit.',
+                );
+            }
+        });
+
+        try {
+            $this->app
+                ->make(PlatformProbeWorker::class)
+                ->completeOutboxEvent($outbox->id);
+            $this->fail('The injected delivered-state failure was not thrown.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(
+                'Injected failure after effect before delivered-state commit.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertDatabaseHas('platform_completion_receipts', [
+            'correlation_id' => $probe->correlation_id,
+            'status' => 'pending',
+            'attempts' => 1,
+            'delivered_at' => null,
+        ]);
+        $this->assertDatabaseHas('platform_probe_runs', [
+            'id' => $probe->id,
+            'status' => 'processing',
+            'completion_code' => null,
+        ]);
+        $this->assertDatabaseHas('outbox_events', [
+            'id' => $outbox->id,
+            'processed_at' => null,
+            'claimed_at' => null,
+        ]);
+        $this->assertDatabaseCount('audit_events', 1);
+        $this->assertSame([$probe->correlation_id], $effectAttempts);
+        $this->assertCount(1, $effectiveDeliveries);
+
+        $this->app
+            ->make(PlatformProbeWorker::class)
+            ->completeOutboxEvent($outbox->id);
+
+        $this->assertDatabaseHas('platform_completion_receipts', [
+            'correlation_id' => $probe->correlation_id,
+            'status' => 'delivered',
+            'attempts' => 2,
+        ]);
+        $this->assertDatabaseHas('platform_probe_runs', [
+            'id' => $probe->id,
+            'status' => 'completed',
+            'completion_code' => 'structured-log.completed',
+        ]);
+        $this->assertSame(
+            [$probe->correlation_id, $probe->correlation_id],
+            $effectAttempts,
+        );
+        $this->assertSame(1, count(array_unique($effectAttempts)));
+        $this->assertCount(1, $effectiveDeliveries);
+        $this->assertDatabaseCount('audit_events', 2);
+
+        $this->app
+            ->make(PlatformProbeWorker::class)
+            ->completeOutboxEvent($outbox->id);
+
+        $this->assertCount(2, $effectAttempts);
+        $this->assertCount(1, $effectiveDeliveries);
+        $this->assertDatabaseCount('audit_events', 2);
     }
 
     public function test_production_actor_adapter_ignores_the_test_header(): void
