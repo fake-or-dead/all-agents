@@ -12,7 +12,7 @@ export APP_BUILD_VERSION=local-reviewed
 export APP_BUILD_COMMIT="$(git rev-parse HEAD)"
 bin/build-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT"
 export TAPODA_APP_IMAGE="$(docker image inspect --format '{{.Id}}' "tapoda-next:${APP_BUILD_VERSION}")"
-docker compose up -d postgres redis
+docker compose up -d --wait --wait-timeout 60 postgres redis
 docker compose --profile tools up --no-deps --abort-on-container-exit --exit-code-from migrate migrate
 docker compose up -d web worker scheduler
 bin/assert-runtime-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT" migrate web worker scheduler

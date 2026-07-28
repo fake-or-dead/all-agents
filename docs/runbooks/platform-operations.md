@@ -37,7 +37,7 @@ Do not serve traffic from the migration process. Liveness proves the process can
 The local immutable deployment rehearsal uses the same exported artifact for every process:
 
 ```sh
-docker compose up --detach postgres redis
+docker compose up --detach --wait --wait-timeout 60 postgres redis
 docker compose --profile tools up --no-deps --abort-on-container-exit --exit-code-from migrate migrate
 docker compose up --detach web worker scheduler
 bin/assert-runtime-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT" migrate web worker scheduler
@@ -85,7 +85,7 @@ docker compose exec -T postgres pg_dump --format=custom --no-owner --username=ta
 Restore only into an isolated empty PostgreSQL instance:
 
 ```sh
-docker compose --profile restore up --detach --force-recreate postgres-restore redis-restore
+docker compose --profile restore up --detach --wait --wait-timeout 60 --force-recreate postgres-restore redis-restore
 docker compose --profile restore exec -T postgres-restore pg_restore --exit-on-error --no-owner --username=tapoda --dbname=tapoda_restore < tapoda.dump
 docker compose --profile restore up --no-deps --abort-on-container-exit --exit-code-from restore-migrate restore-migrate
 ```
