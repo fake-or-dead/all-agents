@@ -11,3 +11,7 @@ Uses `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wo
 ### Domain docs
 
 Single-context layout using root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
+
+### Agent delivery
+
+Issue branches target `integration/local-complete`. Each issue requires two independent, cross-reviewed approvals on the exact head SHA. See `docs/agents/review-protocol.md`.
