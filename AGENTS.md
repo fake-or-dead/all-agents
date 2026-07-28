@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues and PRDs use local Markdown under `.scratch/`. External PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
+Issues live in `https://github.com/fake-or-dead/all-agents/issues`. The canonical PRD remains `docs/product/tapoda-rebuild-prd.md`. Do not create or update `.scratch/` issue files. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

@@ -1,19 +1,23 @@
-# Issue tracker: Local Markdown
+# Issue tracker: GitHub Issues
 
-Issues and PRDs for this repository live as Markdown files under `.scratch/`.
+Repository: `fake-or-dead/all-agents`
+
+Canonical tracker: <https://github.com/fake-or-dead/all-agents/issues>
+
+The canonical PRD remains [`docs/product/tapoda-rebuild-prd.md`](../product/tapoda-rebuild-prd.md). Do not create or update `.scratch/` issue files.
 
 ## Conventions
 
-- One feature per directory: `.scratch/<feature-slug>/`
-- The PRD is `.scratch/<feature-slug>/PRD.md`
-- Implementation issues are `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`
-- Triage state is recorded as a `Status:` line near the top of each issue file; see `triage-labels.md` for the role strings
-- Comments and conversation history append to the bottom of the file under a `## Comments` heading
+- One independently grabbable vertical slice per GitHub Issue.
+- Titles retain the stable plan prefix: `[01]` through `[32]`.
+- Bodies contain `What to build`, `Acceptance criteria`, `Blocked by`, and `Agent tracking`.
+- Dependencies reference real GitHub issue numbers.
+- Use labels from [`triage-labels.md`](triage-labels.md).
+- Active agents update the issue body or add a progress comment with agent name, branch, exact SHA, checks, blockers, and review state.
+- Completed issues record both reviewer approvals against the same exact SHA before closure.
 
-## When a skill says "publish to the issue tracker"
+## Publishing and fetching
 
-Create a new file under `.scratch/<feature-slug>/`, creating the directory when needed.
-
-## When a skill says "fetch the relevant ticket"
-
-Read the file at the referenced path. The user will normally pass the path or issue number directly.
+- Publish with `gh issue create -R fake-or-dead/all-agents`.
+- Fetch with `gh issue view <number> -R fake-or-dead/all-agents --comments`.
+- List active work with `gh issue list -R fake-or-dead/all-agents --state open`.

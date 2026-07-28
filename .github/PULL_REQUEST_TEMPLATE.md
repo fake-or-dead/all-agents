@@ -1,6 +1,6 @@
 ## Issue
 
-- `.scratch/tapoda-rebuild/issues/NN-slug.md`
+- `https://github.com/fake-or-dead/all-agents/issues/NN`
 
 ## What changed
 
