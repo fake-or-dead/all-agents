@@ -63,7 +63,7 @@ and the authenticated `GET /account` returned HTTP 200.
 | 3 | Course Catalog canonical ownership | Delivered to `main`/`:8080`; Issue #10 closed | PR #34 merge `e675535`, PR #43 merge `b3ff382`, Browser 26/26, local Catalog checks pass | Keep as release baseline |
 | 4 | Deterministic PHPStan memory gate | Delivered to `main` | PR #38 merge `762ff4c`, PR #43 merge `b3ff382`, CI 4/4 | Keep as release gate |
 | 5 | Safe canonical local seed | Delivered to `main`/`:8080`; Issue #36 closed | PR #42 merge `a9389ac`, PR #43 merge `b3ff382`, fresh local seed/sign-in pass | Keep credentials and reset instructions current |
-| 6 | Profile/application security | PR #48 replacement remediation active | PR #48 current remote `908408c` is invalid after address schema/race Mediums; backend 93/693 and prior exact Browser 5/5 pass; final local state-machine fix is under serial browser proof | One final replacement SHA, fresh CI and dual reciprocal review |
+| 6 | Profile/application security | PR #48 replacement remediation active | Local candidate `ec72424800d807ea592dc66bde3419f5ac3ecf8e` fixes fail-closed address parsing/races and passed frontend gates; exact runtime/browser/backend proof is running serially on reused `:18012` infrastructure | Push one replacement only after terminal green evidence, then fresh CI and dual reciprocal review |
 
 ## Active workstreams
 
@@ -74,9 +74,9 @@ and the authenticated `GET /account` returned HTTP 200.
 | Course Catalog | coding + dual review agents complete | Released to `main`/`:8080`; URLs verified above | None | Keep regression gates |
 | Local seed | coding/review agents complete | Released to `main`/`:8080`; real seeded sign-in verified | None | Keep local-only guard |
 | PHPStan gate | coding/review agents complete | Released to `main`; Issue #37 closed | None | Keep deterministic wrapper gate |
-| Issue #12 member center | coding agent active | Five prior Mediums fixed and verified; malformed-success + saved-address race are the current batch | Serial exact-artifact browser and final gates | Push replacement only after terminal green evidence |
-| Issues #13–#24 | PM preparation complete | Implementation-ready task packets posted with dependencies and conflict exclusions | Each waits for its predecessor merge | Start #13 after #12 merge/close |
-| Issue #25 | PM preparation agent active | Read-only task packet in progress | Waits for #24 | Publish packet; no code branch |
+| Issue #12 member center | coding agent active | Candidate `ec72424` committed locally; stable PostgreSQL/Redis reused; only the exact app container may change | Serial exact-artifact browser and final gates after Docker cleanup | Push replacement only after terminal green evidence |
+| Issues #13–#27 | PM preparation complete | Implementation-ready task packets posted with dependencies and conflict exclusions | Each waits for its predecessor merge | Start #13 after #12 merge/close |
+| Docker lifecycle | PM/controller | 18 stale Compose projects and four stopped containers removed; volumes preserved | Host load is recovering from prior container flood | Keep only `tapoda-next` and one active candidate project; inventory before/after every heavy gate |
 
 ## Delivery metrics
 

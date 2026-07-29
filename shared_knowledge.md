@@ -167,6 +167,23 @@ previous status under a new timestamp.
   before migration. Preserve the matching `.env`; when a fresh seed is the
   explicit goal, stop the exact Tapoda containers, verify the exact volume
   name, disclose recoverability, remove only that volume, then recreate/seed.
+- Reuse stable local infrastructure. Keep `tapoda-next` for user checks on
+  `localhost:8080` and at most one active candidate project for serial browser
+  gates. A new SHA may replace only the app container/image; it must not create
+  a new PostgreSQL, Redis, network, or volume when the existing services are
+  healthy.
+- The PM/controller owns Docker lifecycle. Inspect active Compose projects
+  before every heavy gate, reject per-run project names, and remove stopped
+  candidate containers/networks after the gate. Never remove another project
+  or a named volume as routine cleanup.
+- Do not run probes, resets, or test clients with `docker exec` inside the
+  PostgreSQL container. PostgreSQL 18 treats an abnormal untracked child exit as
+  unsafe and can terminate all backends for crash recovery. Use a separate
+  ephemeral client or the app connection, serialize reset/seed/probes, require
+  three consecutive readiness checks, then warm the first browser route.
+- Ephemeral test containers are allowed only one at a time with `--rm` against
+  the reused services. Keep the normal Playwright timeout; infrastructure delay
+  must be diagnosed rather than hidden by a longer timeout.
 
 ## Definition of Done
 

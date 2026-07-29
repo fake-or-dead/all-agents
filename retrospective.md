@@ -176,3 +176,31 @@ Every active delivery hour records:
 - Change applied: Playwright processes that share a database/runtime run serially. Wait for prior real requests and route cleanup, reset fixtures after contamination, and require terminal exit codes. Parallelism remains for disjoint worktrees/runtimes only.
 - Delivery result: the main Catalog/seed runtime remains healthy at exact `b3ff382`, but Issue #12 did not meet the merge/release target. Review found real product and test-state defects; the current PR head is invalid until the final address-state replacement passes serial exact-artifact gates.
 - Next-hour target: finish serial malformed/race/browser and canonical backend gates, push one PR #48 replacement, obtain fresh dual reciprocal approval, merge/close Issue #12, release Member Center to `main`/`:8080`, and merge the accumulated PM retro/dashboard PR.
+
+### 2026-07-29 17:42 +07 — Docker lifecycle incident
+
+- Failure: agents created a new Compose project for isolation on repeated
+  candidate and review runs. No owner tore those projects down. At least 18
+  stale Tapoda Compose projects and more than 70 containers accumulated.
+- Impact: host load reached `34.75`; `/signup` took 15.656 seconds and the
+  verification request produced no response before the normal 30-second
+  Playwright timeout. PostgreSQL recorded two abnormal untracked child exits,
+  terminated all backends, and entered crash recovery. The app then observed
+  `SQLSTATE[08006] ... database system is in recovery mode`.
+- Exclusions: no PostgreSQL row blocker, Redis rate-limit lock, container
+  restart, or OOM kill was present. After concurrent reset/probe activity
+  stopped, the real journey returned to 331 ms GET, 1,131 ms verification
+  request HTTP 202, and 876 ms verification HTTP 200.
+- PM cause: isolation was optimized per test without a total runtime budget,
+  teardown policy, or cleanup owner. The controller accepted new project names
+  and monitored test output without checking Docker inventory.
+- Correction applied: stopped 66 stale containers, then removed 18 stale
+  Compose projects plus four stopped one-shot/standalone containers. Volumes
+  were preserved. `tapoda-next` on `:8080` and
+  `tapoda-issue12-browser` on `:18012` remain; unrelated legacy runtimes remain
+  untouched.
+- Permanent control: stable PostgreSQL/Redis/network/volume are reused.
+  Candidate SHAs replace only the app image/container. The controller owns
+  pre/post-gate inventory and cleanup. Direct PostgreSQL-container exec probes
+  are prohibited; reset, seed, readiness, warmup, and browser work run
+  serially.
