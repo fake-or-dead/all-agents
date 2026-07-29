@@ -314,3 +314,54 @@ Every active delivery hour records:
   obtain CI 4/4 and fresh reciprocal security/acceptance approval, merge #48,
   release Member Center to `main`/`:8080`, merge/rebase PM evidence, and activate
   child #50 only after the resulting exact integration SHA exists.
+
+### 2026-07-29 20:07 +07
+
+- Checkpoint discipline: recorded at the fixed boundary. The active #50 coding
+  and early security review were interrupted for this snapshot.
+- Delivery output: PR #48 merged at `e34bf6c`, Issue #12 closed, PR #49 PM docs
+  merged at `a878957`, and release PR #55 merged to `main` at `dff85f6`. Both
+  duplicate exact-SHA CI runs passed 4/4; security and acceptance passed and
+  reciprocally cross-reviewed the release.
+- Local release proof: exact image
+  `sha256:0cb3bc1da6e89be1f5ce26ad3b64d96f232ab8b47d07102694d6005297bc2818`
+  carries commit `dff85f6`. Additive migration/seed, artifact assertions,
+  bounded smoke, seeded HTTP sign-in, and authenticated profile, training,
+  applications, and password routes pass on `localhost:8080`. Existing
+  PostgreSQL, Redis, network, and volumes were reused; only app containers were
+  replaced.
+- PM evidence output: PR #56 initially passed CI 4/4 but review found the
+  supposedly completed Docker cleanup still left `issue36seed` in stopped
+  Compose inventory. Normal-profile cleanup left a tools-profile seed container.
+  A second profile-aware cleanup removed the exact containers/network without
+  `-v`; `issue36seed_postgres-data` remains. Fresh dual reciprocal review then
+  passed and PR #56 merged.
+- Coordination failure: PM treated `tapoda-issue12-browser` as obsolete after
+  release and tore it down while #50 still held a service-gate dependency on
+  its PostgreSQL/network. The volume was preserved and only the same project
+  PostgreSQL/Redis services were restarted, but the avoidable teardown/restart
+  violated the stable-infrastructure rule.
+- Control added: every candidate project has an explicit lease owner and active
+  consumers. PM must query agents before teardown, inventory normal and all
+  relevant profiles, and release the lease only after the coding/review agent
+  confirms no remaining service gate. Feature release alone does not imply its
+  candidate infrastructure is idle.
+- Small-slice result: #50 started from exact `a878957` with no new Compose
+  project. RED→GREEN completed the published schema resolver, strict schema
+  validation, architecture boundary, and real PostgreSQL immutability proofs.
+  Early review found two High and four Medium gaps before any remote SHA:
+  published-child re-parenting, mutable published definition identity,
+  validation-rule shape/bounds, incomplete existing-seed footprint checks,
+  version/assignment locale mismatch, and inconsistent
+  `published`/`published_at`. Four are fixed locally; seed-footprint and status
+  consistency remain open at this checkpoint.
+- Dependency discovery: #51 is 60–90 minute sized only after #50 and a separate
+  server-owned eligibility/persona evidence slice. Current code accepts
+  age/category/applicant type from the browser and lacks authoritative DOB,
+  category, lay/monastic, intent, or eligibility evidence. Prerequisite Issue
+  #57 now blocks #51; client-derived persona/context is forbidden.
+- Next-hour target: close all #50 early-review findings, rerun focused and full
+  backend/service/static/frontend/browser gates on stable leased services, push
+  one exact candidate, then obtain CI 4/4 and fresh reciprocal security and
+  acceptance review. Do not start #51 coding; refine #57 after #50's exact
+  interface is merged.
