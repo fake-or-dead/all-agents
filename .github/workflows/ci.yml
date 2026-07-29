@@ -22,7 +22,8 @@ jobs:
           docker run --rm tapoda-next:test composer audit --locked
           docker run --rm tapoda-next:test vendor/bin/pint --test app routes tests database config bootstrap/app.php bootstrap/providers.php
           docker run --rm tapoda-next:test php tools/architecture-check.php
-          docker run --rm tapoda-next:test vendor/bin/phpstan analyse --memory-limit=512M
+          docker run --rm -v "$PWD":/repo:ro -w /repo tapoda-next:test php tools/verify-phpstan-contract.php
+          docker run --rm tapoda-next:test bin/phpstan
           docker run --rm tapoda-next:test php vendor/bin/phpunit
       - name: PostgreSQL and Redis service-integration proofs
         env:

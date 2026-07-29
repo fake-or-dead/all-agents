@@ -47,7 +47,7 @@
             "@php vendor/bin/pint --test"
         ],
         "analyse": [
-            "@php vendor/bin/phpstan analyse --memory-limit=512M"
+            "bin/phpstan"
         ],
         "architecture": [
             "@php tools/architecture-check.php"

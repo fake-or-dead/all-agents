@@ -29,9 +29,16 @@ The smoke gate polls liveness, readiness, the Thai home page, and verifies that 
 
 ```sh
 docker compose --profile tools run --rm test
+docker compose --profile tools run --rm test bin/phpstan
 docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d npm run typecheck
 docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d npm run lint
 docker run --rm -v "$PWD":/app -w /app node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d npm run build
 ```
+
+PHPStan always runs through `bin/phpstan`: `php -d memory_limit=1G` sets the PHP
+process and parallel-worker limit, while `--memory-limit=1G` sets PHPStan's own
+limit. The 1G bound is deliberate: the full `app` analysis exhausted the image's
+default 128M worker limit, and completed with this bound. The wrapper uses `exec`,
+so an analysis failure remains a failing local or CI gate.
 
 See [platform operations](docs/runbooks/platform-operations.md) for deploy, monitoring, rollback, and restore procedures.
