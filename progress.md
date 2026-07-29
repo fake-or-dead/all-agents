@@ -63,7 +63,7 @@ and the authenticated `GET /account` returned HTTP 200.
 | 3 | Course Catalog canonical ownership | Delivered to `main`/`:8080`; Issue #10 closed | PR #34 merge `e675535`, PR #43 merge `b3ff382`, Browser 26/26, local Catalog checks pass | Keep as release baseline |
 | 4 | Deterministic PHPStan memory gate | Delivered to `main` | PR #38 merge `762ff4c`, PR #43 merge `b3ff382`, CI 4/4 | Keep as release gate |
 | 5 | Safe canonical local seed | Delivered to `main`/`:8080`; Issue #36 closed | PR #42 merge `a9389ac`, PR #43 merge `b3ff382`, fresh local seed/sign-in pass | Keep credentials and reset instructions current |
-| 6 | Profile/application security | PR #48 second review-remediation batch active | Exact `e4ce03c` passed all local gates but GitHub browser failed 26/32 with 5 not run; security/acceptance found password-negative, training-idempotency, CI-fixture, and shared-worker Mediums | Finish one replacement batch, full configured browser/backend/static proof, push once, then fresh CI and dual reciprocal review |
+| 6 | Profile/application security | PR #48 third review-remediation batch in final local browser gates | Rejected `4b4ecaa` passed CI 4/4 but lost idempotency across reload/5xx and leaked low-entropy equality via unkeyed digest; local `e68d9dd` now preserves opaque key across recovery and encrypts canonical payload; backend/static/frontend/Member gates green | Finish exact Member/full browser terminal proof, push once, then fresh CI and dual reciprocal review |
 
 ## Active workstreams
 
@@ -74,9 +74,9 @@ and the authenticated `GET /account` returned HTTP 200.
 | Course Catalog | coding + dual review agents complete | Released to `main`/`:8080`; URLs verified above | None | Keep regression gates |
 | Local seed | coding/review agents complete | Released to `main`/`:8080`; real seeded sign-in verified | None | Keep local-only guard |
 | PHPStan gate | coding/review agents complete | Released to `main`; Issue #37 closed | None | Keep deterministic wrapper gate |
-| Issue #12 member center | coding agent active | Password negative-flow GREEN 1/41; sequential training idempotency GREEN 1/15; exact `e4ce03c` rejected by browser CI and two Medium reviews | PostgreSQL concurrency, ambiguous browser, deterministic CI fixture, full configured-worker gates | Push one replacement batch only after terminal green evidence |
+| Issue #12 member center | coding agent active | Local `e68d9dd`; backend 96/709, service integration 9/68, PG concurrency 1/16, Member 6/6, static/frontend green; exact image `a0b898b5...` on reused `:18012` | Terminal exact Member/full configured browser reruns | Push one replacement only after terminal green, then fresh CI/reviews |
 | Issue #13 application | PM decomposed | Umbrella retained; child Issues #50–#54 track Form Engine, start/resume, autosave, atomic submit, receipt/timeline | #50 waits for #12 exact merge | Assign #50 only after #12 closes |
-| Issues #14–#32 | PM sizing audit complete | All 19 umbrellas exceed PR-sized rule; #14–#29 packets prepared, #30/#31 now marked XL with local child slices | Each waits for predecessor; child Issues created just in time | Decompose each umbrella before coding; never assign original XL packet as one batch |
+| Issues #14–#32 | PM decomposition complete | #14–#29 have PR-sized decomposition comments; #30–#32 are explicit XL multi-PR local packets with production actions separated | Each waits for predecessor; child Issues created just in time | Never assign original XL packet as one batch |
 | Docker lifecycle | PM/controller | 18 stale Compose projects and four stopped containers removed; volumes preserved | Host load is recovering from prior container flood | Keep only `tapoda-next` and one active candidate project; inventory before/after every heavy gate |
 
 ## Delivery metrics

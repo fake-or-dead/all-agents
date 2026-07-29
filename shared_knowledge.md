@@ -204,6 +204,22 @@ previous status under a new timestamp.
   same transaction as the domain mutation and audit. Same key plus same payload
   returns the original result; same key plus different payload conflicts;
   concurrent or ambiguous-response replay produces one mutation and one audit.
+- Browser-held idempotency must survive the recovery actions the UI presents.
+  For a create operation with ambiguous outcome, retain one opaque operation
+  UUID across network errors, HTTP 5xx, payload edits, visible reload, and manual
+  reload. Store no domain payload or PII in browser persistence. Clear the key
+  only after confirmed success/replay or explicit reconciled abandonment.
+- Do not store an unkeyed deterministic digest of low-entropy encrypted domain
+  fields. It exposes equality and enables dictionary testing. Persist a
+  randomized authenticated encrypted canonical request or use a reviewed,
+  versioned domain-keyed construction; compare only inside the authorized
+  transaction and fail closed on corrupt/unreadable evidence.
+- Secret scanning applies to the complete PR commit range, not only the final
+  tree. A later commit that removes a synthetic secret-like literal does not
+  erase the detector finding. Preserve a local backup, rebuild the feature range
+  from the exact base into clean history, prove final-tree equivalence, and
+  force-push only with an exact lease. Never disable or broadly allowlist the
+  scanner to hide a committed finding.
 
 ## Definition of Done
 

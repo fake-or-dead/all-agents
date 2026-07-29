@@ -255,3 +255,62 @@ Every active delivery hour records:
   browser plus backend/static gates, push once, obtain CI 4/4 and fresh dual
   reciprocal exact-SHA review, merge #48, then release Member Center to
   `main`/`:8080` and activate child #50.
+
+### 2026-07-29 19:07 +07
+
+- Checkpoint discipline: recorded at the fixed boundary while the final exact
+  browser gate continues. No CI or browser result was awaited before taking the
+  snapshot.
+- Output: #13 now has child Issues #50–#54. Every umbrella #14–#29 has a
+  published PR-sized decomposition comment, and #30–#32 packets explicitly
+  classify themselves as XL multi-PR local scopes. No later coding agent may
+  receive the original umbrella as one batch.
+- PR #48 output: clean one-commit SHA `4b4ecaa` passed GitHub CI 4/4 after the
+  branch history was squashed. Its final tree matched the prior candidate
+  exactly, but fresh reviews correctly rejected it despite green CI.
+- Secret-gate lesson: the first gitleaks repair removed the synthetic
+  password-like literal only from the final tree. Gitleaks scans every commit in
+  the PR range, so the historical offending commit still failed. A safe
+  branch-only squash from exact integration base, exact force-with-lease, local
+  backup ref, tree-equivalence proof, and one clean commit removed it without
+  disabling or allowlisting the detector.
+- Review output: acceptance found a High retry defect. After an ambiguous
+  committed training request, the visible `โหลดใหม่` action destroyed the
+  React-ref-only idempotency key; retry after reload could duplicate the row and
+  audit. Security added that every nonzero 5xx cleared the key and that an
+  unkeyed SHA-256 of low-entropy encrypted training fields leaked equality and
+  dictionary-test material.
+- Change applied locally: pending training creation now persists only an opaque
+  UUID in session storage; no course/provider/date payload is stored. Network
+  failure, 5xx, payload edit, visible reload, and manual reload preserve the
+  key. Confirmed 2xx/replay or explicit reconciled abandonment clears it.
+  Browser proof covers commit+abort, reload, same-key HTTP 200 replay, one DOM
+  row/one audit, 503 then changed-payload 409, and original-payload replay.
+- Data-protection change: the unkeyed digest column is replaced by randomized
+  authenticated encryption of canonical request JSON through the existing
+  Laravel Encrypter. Replay decrypts and constant-compares under the same
+  transaction; corruption fails closed. Equal payloads expose no deterministic
+  database equality material and no plaintext field.
+- Current exact local candidate: `e68d9dd852d80f0f841fc9be8ebd5b16e9ae5ad5`,
+  image
+  `sha256:a0b898b5b085987522b8221bde43723c8f9b99684aa4dd6deea57cda32a65195`.
+  Exact seed/web/worker/scheduler assertions passed on reused
+  `tapoda-issue12-browser` PostgreSQL/Redis/network/volume. Focused backend
+  passed 1/27, PostgreSQL concurrency 1/16, full backend 96/709, service
+  integration 9/68, Member browser 6/6, Pint 166, PHPStan 105, architecture,
+  Composer/npm audit, and all frontend gates. Final exact browser reruns are in
+  progress; nothing is pushed.
+- Docker result: no new project was created. The candidate reused the same
+  four-hour PostgreSQL/Redis services and replaced only exact app containers.
+  Host load is `6.22`, down from the incident peak `34.75`.
+- PM result: PR #49 head `d312eaf` passed CI 4/4 and remains held behind #48.
+  `localhost:8080` remains approved main `b3ff382`; no rejected candidate was
+  released.
+- Delivery result: #12 still misses the merge/release target, but the hour
+  converted two review findings into executable cross-reload and encrypted
+  idempotency contracts, completed task decomposition for every remaining
+  umbrella, and reached full local gates except the terminal browser reruns.
+- Next-hour target: finish exact Member/full browser gates, push one replacement,
+  obtain CI 4/4 and fresh reciprocal security/acceptance approval, merge #48,
+  release Member Center to `main`/`:8080`, merge/rebase PM evidence, and activate
+  child #50 only after the resulting exact integration SHA exists.
