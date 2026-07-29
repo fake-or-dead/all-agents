@@ -3,6 +3,9 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
     testDir: "tests/Browser",
     fullyParallel: true,
+    // Browser journeys intentionally exercise shared PostgreSQL and Redis
+    // state, including one client-address rate-limit bucket.
+    workers: 1,
     forbidOnly: Boolean(process.env.CI),
     retries: process.env.CI ? 2 : 0,
     reporter: process.env.CI

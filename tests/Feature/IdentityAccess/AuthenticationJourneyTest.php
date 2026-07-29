@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Group;
@@ -426,16 +427,115 @@ final class AuthenticationJourneyTest extends TestCase
             'revoked_reason' => 'credential_change',
         ]);
         $this->get('/account/password')->assertMethodNotAllowed();
+    }
 
-        $this->postJson('/account/password', [
-            'current_password' => 'wrong-current-password',
-            'password' => 'replacement-password-789',
-            'password_confirmation' => 'replacement-password-789',
-        ])->assertUnprocessable();
+    public function test_password_change_failures_are_thai_field_scoped_secret_safe_and_non_mutating(): void
+    {
+        $currentPassword = $this->syntheticPassword('current', '123');
+        $wrongPassword = $this->syntheticPassword('wrong', '456');
+        $replacementPassword = $this->syntheticPassword('replacement', '789');
+        $mismatchedPassword = $this->syntheticPassword('different', '012');
+        $weakPassword = 'weak'.'123';
+        $accountId = $this->createAccount(
+            'personal_id',
+            '2322222222222',
+            $currentPassword,
+        );
+        $this->postJson('/signin', [
+            'identity_type' => 'personal_id',
+            'identity_number' => '2322222222222',
+            'password' => $currentPassword,
+        ])->assertOk();
+        $authSessionId = (string) session('identity_access.auth_session_id');
+        DB::table('auth_sessions')->insert([
+            'id' => 'password-failure-other-session',
+            'account_id' => $accountId,
+            'credential_epoch' => 1,
+            'authenticated_at' => CarbonImmutable::now(),
+            'last_seen_at' => CarbonImmutable::now(),
+        ]);
+        $originalHash = DB::table('credentials')
+            ->where('account_id', $accountId)
+            ->value('password_hash');
+        Log::spy();
+
+        $wrongCurrent = $this->postJson('/account/password', [
+            'current_password' => $wrongPassword,
+            'password' => $replacementPassword,
+            'password_confirmation' => $replacementPassword,
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'รหัสผ่านปัจจุบันไม่ถูกต้อง')
+            ->assertJsonPath('errors.current_password.0', 'รหัสผ่านปัจจุบันไม่ถูกต้อง');
+
+        $weak = $this->postJson('/account/password', [
+            'current_password' => $currentPassword,
+            'password' => $weakPassword,
+            'password_confirmation' => $weakPassword,
+        ])->assertUnprocessable()
+            ->assertJsonPath('errors.password.0', 'รหัสผ่านใหม่ต้องมีอย่างน้อย 12 ตัวอักษร');
+
+        $mismatch = $this->postJson('/account/password', [
+            'current_password' => $currentPassword,
+            'password' => $replacementPassword,
+            'password_confirmation' => $mismatchedPassword,
+        ])->assertUnprocessable()
+            ->assertJsonPath(
+                'errors.password_confirmation.0',
+                'คำยืนยันรหัสผ่านใหม่ไม่ตรงกับรหัสผ่านใหม่',
+            );
+
+        foreach ([$wrongCurrent, $weak, $mismatch] as $response) {
+            $content = $response->getContent();
+            foreach ([
+                $currentPassword,
+                $wrongPassword,
+                $replacementPassword,
+                $weakPassword,
+                $mismatchedPassword,
+            ] as $secret) {
+                self::assertStringNotContainsString($secret, $content);
+            }
+        }
+
+        self::assertSame(
+            $originalHash,
+            DB::table('credentials')->where('account_id', $accountId)->value('password_hash'),
+        );
+        $this->assertDatabaseHas('accounts', [
+            'id' => $accountId,
+            'credential_epoch' => 1,
+        ]);
+        $this->assertDatabaseHas('auth_sessions', [
+            'id' => $authSessionId,
+            'credential_epoch' => 1,
+            'revoked_at' => null,
+        ]);
+        $this->assertDatabaseHas('auth_sessions', [
+            'id' => 'password-failure-other-session',
+            'credential_epoch' => 1,
+            'revoked_at' => null,
+        ]);
+        $this->get('/account')->assertOk();
         $this->assertDatabaseHas('audit_events', [
             'action' => 'account.password.changed',
             'outcome' => 'denied',
         ]);
+        $audit = DB::table('audit_events')
+            ->where('action', 'account.password.changed')
+            ->where('outcome', 'denied')
+            ->value('context');
+        self::assertIsString($audit);
+        foreach ([$currentPassword, $wrongPassword, $replacementPassword] as $secret) {
+            self::assertStringNotContainsString($secret, $audit);
+        }
+        foreach (['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'] as $level) {
+            Log::shouldNotHaveReceived($level);
+        }
+    }
+
+    private function syntheticPassword(string $variant, string $suffix): string
+    {
+        return implode('-', ['member', 'fixture', $variant, $suffix]);
     }
 
     private function createAccount(

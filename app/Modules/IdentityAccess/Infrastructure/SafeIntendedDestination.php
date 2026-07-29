@@ -6,6 +6,20 @@ final class SafeIntendedDestination
 {
     public function accountPath(string $candidate): ?string
     {
+        return $this->safePath($candidate, ['/account']);
+    }
+
+    public function memberPath(string $candidate): ?string
+    {
+        return $this->safePath(
+            $candidate,
+            ['/member', '/member/profile', '/member/applications', '/member/training', '/member/password'],
+        );
+    }
+
+    /** @param list<string> $allowedPaths */
+    private function safePath(string $candidate, array $allowedPaths): ?string
+    {
         $decoded = rawurldecode($candidate);
 
         if (
@@ -24,7 +38,7 @@ final class SafeIntendedDestination
             $parts === false
             || isset($parts['scheme'])
             || isset($parts['host'])
-            || ($parts['path'] ?? '') !== '/account'
+            || ! in_array(($parts['path'] ?? ''), $allowedPaths, true)
         ) {
             return null;
         }

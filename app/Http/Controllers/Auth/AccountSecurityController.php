@@ -28,10 +28,22 @@ final class AccountSecurityController extends Controller
             'current_password' => ['required', 'string', new MaxUtf8Bytes(72)],
             'password' => [
                 'required',
-                'confirmed',
+                'string',
                 Password::min(12)->letters()->numbers(),
                 new MaxUtf8Bytes(72),
             ],
+            'password_confirmation' => ['required', 'string', 'same:password'],
+        ], [
+            'current_password.required' => 'กรุณาระบุรหัสผ่านปัจจุบัน',
+            'current_password.string' => 'รหัสผ่านปัจจุบันต้องเป็นข้อความ',
+            'password.required' => 'กรุณาระบุรหัสผ่านใหม่',
+            'password.string' => 'รหัสผ่านใหม่ต้องเป็นข้อความ',
+            'password.min' => 'รหัสผ่านใหม่ต้องมีอย่างน้อย 12 ตัวอักษร',
+            'password.letters' => 'รหัสผ่านใหม่ต้องมีตัวอักษรอย่างน้อย 1 ตัว',
+            'password.numbers' => 'รหัสผ่านใหม่ต้องมีตัวเลขอย่างน้อย 1 ตัว',
+            'password_confirmation.required' => 'กรุณายืนยันรหัสผ่านใหม่',
+            'password_confirmation.string' => 'คำยืนยันรหัสผ่านใหม่ต้องเป็นข้อความ',
+            'password_confirmation.same' => 'คำยืนยันรหัสผ่านใหม่ไม่ตรงกับรหัสผ่านใหม่',
         ]);
         $result = $this->identityAccess->changePassword(
             (string) Auth::id(),
@@ -42,7 +54,12 @@ final class AccountSecurityController extends Controller
         );
 
         if (! $result->successful) {
-            return response()->json(['message' => 'รหัสผ่านปัจจุบันไม่ถูกต้อง'], 422);
+            $message = 'รหัสผ่านปัจจุบันไม่ถูกต้อง';
+
+            return response()->json([
+                'message' => $message,
+                'errors' => ['current_password' => [$message]],
+            ], 422);
         }
 
         return response()->json(['message' => 'เปลี่ยนรหัสผ่านแล้ว']);

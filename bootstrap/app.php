@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\ProtectRecoveryTokenResponse;
 use App\Http\Middleware\RequireActiveAccountSession;
+use App\Http\Middleware\UseLocalTestClientAddress;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(
             static fn (): string => route('auth.sign-in', absolute: false),
         );
+        $middleware->appendToGroup('web', UseLocalTestClientAddress::class);
         $middleware->appendToGroup('web', ProtectRecoveryTokenResponse::class);
         $middleware->appendToGroup('web', RequireActiveAccountSession::class);
     })

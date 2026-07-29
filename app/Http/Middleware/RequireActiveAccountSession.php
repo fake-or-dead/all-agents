@@ -26,8 +26,10 @@ final readonly class RequireActiveAccountSession
         $authSessionId = $request->session()->get('identity_access.auth_session_id');
 
         if ($account === null) {
-            if ($request->routeIs('account.*')) {
-                $destination = $this->destinations->accountPath($request->getRequestUri());
+            if ($request->routeIs('account.*', 'member.*')) {
+                $destination = $request->routeIs('member.*')
+                    ? $this->destinations->memberPath($request->getRequestUri())
+                    : $this->destinations->accountPath($request->getRequestUri());
 
                 if ($destination !== null) {
                     $request->session()->put('url.intended', $destination);
