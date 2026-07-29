@@ -2,6 +2,10 @@
 
 Every issue branch targets `integration/local-complete`. Every issue is reviewed at one immutable head commit.
 
+Review begins after dependency integration and the final local candidate gates.
+Independently usable approved slices are released to `main` without waiting for
+all 32 issues.
+
 ## Reviewer A: architecture and security
 
 Inspect:
