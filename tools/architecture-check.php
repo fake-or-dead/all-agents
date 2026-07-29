@@ -8,6 +8,7 @@ $allowedDependencies = [
     'Audit' => [],
     'CourseCatalog' => ['ApplicationWorkflow', 'DocumentsConsent'],
     'DocumentsConsent' => [],
+    'FormEngine' => [],
     'IdentityAccess' => ['DocumentsConsent', 'People'],
     'People' => ['ReferenceData'],
     'PlatformOperations' => ['Audit', 'IdentityAccess'],
@@ -31,6 +32,15 @@ $ownedTables = [
         'consent_document_versions',
         'consent_acceptances',
         'document_publication_projections',
+    ],
+    'FormEngine' => [
+        'form_definitions',
+        'form_versions',
+        'form_sections',
+        'form_fields',
+        'form_options',
+        'form_assignments',
+        'form_publication_events',
     ],
     'IdentityAccess' => [
         'accounts',
