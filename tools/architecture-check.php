@@ -14,10 +14,23 @@ $allowedDependencies = [
     'ReferenceData' => [],
 ];
 $ownedTables = [
+    'ApplicationWorkflow' => [
+        'application_workflow_facts',
+    ],
+    'CourseCatalog' => [
+        'course_types',
+        'centers',
+        'courses',
+        'course_sessions',
+        'teachers',
+        'course_session_teachers',
+        'course_capacity_rules',
+    ],
     'DocumentsConsent' => [
         'consent_documents',
         'consent_document_versions',
         'consent_acceptances',
+        'document_publication_projections',
     ],
     'IdentityAccess' => [
         'accounts',
@@ -28,6 +41,7 @@ $ownedTables = [
         'local_verification_deliveries',
     ],
     'People' => ['people', 'person_identifiers', 'person_account_link_proofs'],
+    'ReferenceData' => ['provinces', 'amphoes', 'tambons'],
 ];
 $violations = [];
 $modules = [];
