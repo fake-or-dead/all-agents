@@ -60,6 +60,8 @@ final readonly class IdentitySecurityConfiguration
             throw new RuntimeException('Identity security keys must be distinct.');
         }
 
+        $this->assertSupportedBcryptCosts();
+
         if (
             $adapter === 'deterministic-fake'
             && preg_match('/^\d{6}$/', (string) $this->config->get(
@@ -87,5 +89,39 @@ final readonly class IdentitySecurityConfiguration
         }
 
         return $keys;
+    }
+
+    private function assertSupportedBcryptCosts(): void
+    {
+        $configuredCost = $this->config->get('hashing.bcrypt.rounds');
+        $costs = $this->config->get('identity-access.supported_bcrypt_costs');
+        $hashes = $this->config->get('identity-access.bcrypt_dummy_hashes');
+
+        if (! is_numeric($configuredCost) || ! is_array($costs) || ! is_array($hashes)) {
+            throw new RuntimeException('Supported bcrypt costs are not configured.');
+        }
+        $configuredCost = (int) $configuredCost;
+
+        $supportedCosts = array_values(array_unique(array_filter(
+            $costs,
+            static fn (mixed $cost): bool => is_int($cost) && $cost >= 4 && $cost <= 31,
+        )));
+
+        if ($supportedCosts === [] || ! in_array($configuredCost, $supportedCosts, true)) {
+            throw new RuntimeException("Unsupported configured bcrypt cost {$configuredCost}.");
+        }
+
+        foreach ($supportedCosts as $cost) {
+            $hash = $hashes[$cost] ?? null;
+            $info = is_string($hash) ? password_get_info($hash) : null;
+
+            if (
+                ! is_array($info)
+                || ($info['algoName'] ?? null) !== 'bcrypt'
+                || ($info['options']['cost'] ?? null) !== $cost
+            ) {
+                throw new RuntimeException("Invalid dummy bcrypt hash for cost {$cost}.");
+            }
+        }
     }
 }

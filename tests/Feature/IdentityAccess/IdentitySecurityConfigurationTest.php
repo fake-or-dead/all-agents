@@ -70,4 +70,27 @@ final class IdentitySecurityConfigurationTest extends TestCase
         $this->expectExceptionMessage('Identity security keys must be distinct');
         $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
     }
+
+    public function test_boot_validation_rejects_an_unreviewed_bcrypt_round_before_serving_requests(): void
+    {
+        config()->set('hashing.bcrypt.rounds', 11);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Unsupported configured bcrypt cost 11');
+
+        $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
+    }
+
+    public function test_boot_validation_rejects_a_dummy_hash_with_the_wrong_declared_cost(): void
+    {
+        config()->set(
+            'identity-access.bcrypt_dummy_hashes.10',
+            (string) config('identity-access.bcrypt_dummy_hashes.12'),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Invalid dummy bcrypt hash for cost 10');
+
+        $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
+    }
 }
