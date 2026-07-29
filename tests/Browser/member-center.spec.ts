@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 
 const originalPassword = "browser-password-123";
 const replacementPassword = "member-replacement-456";
+const trainingOperationStorageKey =
+    "tapoda.member.training-add.idempotency-key.v1";
 
 test.describe.configure({ mode: "serial" });
 test.beforeEach(async ({ context }) => {
@@ -80,6 +82,28 @@ async function expectNoOverflow(page: Page) {
                 document.documentElement.clientWidth,
         ),
     ).toBe(true);
+}
+
+function successfulTrainingAuditCount(): number {
+    const container = process.env.PLAYWRIGHT_MEMBER_CONTAINER;
+    const php = [
+        "require 'vendor/autoload.php';",
+        "$app = require 'bootstrap/app.php';",
+        "$app->make(Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap();",
+        "echo Illuminate\\Support\\Facades\\DB::table('audit_events')",
+        "->where('action', 'people.training.added')",
+        "->where('outcome', 'succeeded')->count();",
+    ].join("");
+    const command = container
+        ? ["exec", container, "php", "-r", php]
+        : ["compose", "exec", "-T", "web", "php", "-r", php];
+
+    return Number(
+        execFileSync("docker", command, {
+            cwd: process.cwd(),
+            encoding: "utf8",
+        }).trim(),
+    );
 }
 
 test("FLOW-MEMBER-01 profile, Thai address, training, and deep links are owned and accessible", async ({
@@ -172,6 +196,7 @@ test("FLOW-MEMBER-01 profile, Thai address, training, and deep links are owned a
     await page.getByLabel("หน่วยงาน/ศูนย์").fill("ศูนย์ทดสอบ");
     await page.getByLabel("วันที่เริ่ม").fill("2026-02-10");
     await page.getByLabel("วันที่จบ").fill("2026-02-12");
+    const auditCountBeforeLostResponse = successfulTrainingAuditCount();
     let addTrainingRequests = 0;
     const addTrainingKeys: string[] = [];
     await page.route("**/member/training", async (route) => {
@@ -193,6 +218,52 @@ test("FLOW-MEMBER-01 profile, Thai address, training, and deep links are owned a
     });
     await page.getByRole("button", { name: "เพิ่มประวัติการอบรม" }).click();
     await expect(page.getByRole("alert")).toContainText("เชื่อมต่อระบบไม่ได้");
+    await expect(page.getByRole("button", { name: "โหลดใหม่" })).toBeVisible();
+    const storageAfterLostResponse = await page.evaluate(
+        (operationKey) => ({
+            local: Object.fromEntries(Object.entries(localStorage)),
+            session: Object.fromEntries(Object.entries(sessionStorage)),
+            operation: sessionStorage.getItem(operationKey),
+        }),
+        trainingOperationStorageKey,
+    );
+    expect(storageAfterLostResponse.operation).toBe(addTrainingKeys[0]);
+    expect(storageAfterLostResponse.operation).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    for (const privateValue of [
+        "อบรมสติ",
+        "ศูนย์ทดสอบ",
+        "2026-02-10",
+        "2026-02-12",
+    ]) {
+        expect(JSON.stringify(storageAfterLostResponse)).not.toContain(
+            privateValue,
+        );
+    }
+    await Promise.all([
+        page.waitForNavigation(),
+        page.getByRole("button", { name: "โหลดใหม่" }).click(),
+    ]);
+    await expect(page.getByText("อบรมสติ")).toHaveCount(1);
+    expect(
+        await page.evaluate(
+            (operationKey) => sessionStorage.getItem(operationKey),
+            trainingOperationStorageKey,
+        ),
+    ).toBe(addTrainingKeys[0]);
+    await page.reload();
+    await expect(page.getByText("อบรมสติ")).toHaveCount(1);
+    expect(
+        await page.evaluate(
+            (operationKey) => sessionStorage.getItem(operationKey),
+            trainingOperationStorageKey,
+        ),
+    ).toBe(addTrainingKeys[0]);
+    await page.getByLabel("ชื่อหลักสูตร").fill("อบรมสติ");
+    await page.getByLabel("หน่วยงาน/ศูนย์").fill("ศูนย์ทดสอบ");
+    await page.getByLabel("วันที่เริ่ม").fill("2026-02-10");
+    await page.getByLabel("วันที่จบ").fill("2026-02-12");
     const replayResponsePromise = page.waitForResponse(
         (response) =>
             response.url().endsWith("/member/training") &&
@@ -209,6 +280,106 @@ test("FLOW-MEMBER-01 profile, Thai address, training, and deep links are owned a
     expect(addTrainingKeys[1]).toBe(addTrainingKeys[0]);
     await expect(page.getByText("อบรมสติ")).toBeVisible();
     await expect(page.getByText("อบรมสติ")).toHaveCount(1);
+    expect(successfulTrainingAuditCount()).toBe(
+        auditCountBeforeLostResponse + 1,
+    );
+    expect(
+        await page.evaluate(
+            (operationKey) => sessionStorage.getItem(operationKey),
+            trainingOperationStorageKey,
+        ),
+    ).toBeNull();
+
+    const auditCountBeforeFiveHundred = successfulTrainingAuditCount();
+    await page.getByLabel("ชื่อหลักสูตร").fill("อบรมอานาปานสติ");
+    await page.getByLabel("หน่วยงาน/ศูนย์").fill("ศูนย์ห้าร้อย");
+    await page.getByLabel("วันที่เริ่ม").fill("2026-03-10");
+    await page.getByLabel("วันที่จบ").fill("2026-03-12");
+    const requestCountBeforeFiveHundred = addTrainingRequests;
+    await page.route("**/member/training", async (route) => {
+        if (route.request().method() !== "POST") {
+            await route.continue();
+            return;
+        }
+        addTrainingRequests += 1;
+        addTrainingKeys.push(
+            route.request().headers()["idempotency-key"] ?? "",
+        );
+        if (addTrainingRequests === requestCountBeforeFiveHundred + 1) {
+            const committed = await route.fetch();
+            expect(committed.status()).toBe(201);
+            await route.fulfill({
+                status: 503,
+                contentType: "application/json",
+                body: JSON.stringify({
+                    message: "ระบบยังยืนยันผลการบันทึกไม่ได้",
+                }),
+            });
+            return;
+        }
+        await route.continue();
+    });
+    await page.getByRole("button", { name: "เพิ่มประวัติการอบรม" }).click();
+    await expect(page.getByRole("alert")).toContainText(
+        "ระบบยังยืนยันผลการบันทึกไม่ได้",
+    );
+    const fiveHundredKey = addTrainingKeys.at(-1);
+    expect(fiveHundredKey).toBeTruthy();
+    expect(
+        await page.evaluate(
+            (operationKey) => sessionStorage.getItem(operationKey),
+            trainingOperationStorageKey,
+        ),
+    ).toBe(fiveHundredKey);
+
+    await page.getByLabel("ชื่อหลักสูตร").fill("ข้อมูลใหม่ห้ามใช้คีย์เดิม");
+    const conflictResponsePromise = page.waitForResponse(
+        (response) =>
+            response.url().endsWith("/member/training") &&
+            response.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "เพิ่มประวัติการอบรม" }).click();
+    const conflictResponse = await conflictResponsePromise;
+    expect(conflictResponse.status()).toBe(409);
+    expect(await conflictResponse.json()).toMatchObject({
+        code: "idempotency-conflict",
+    });
+    expect(addTrainingKeys.at(-1)).toBe(fiveHundredKey);
+    expect(
+        await page.evaluate(
+            (operationKey) => sessionStorage.getItem(operationKey),
+            trainingOperationStorageKey,
+        ),
+    ).toBe(fiveHundredKey);
+    await expect(
+        page.getByRole("button", {
+            name: "ตรวจสอบรายการแล้ว เริ่มคำขอใหม่",
+        }),
+    ).toBeVisible();
+
+    await page.getByLabel("ชื่อหลักสูตร").fill("อบรมอานาปานสติ");
+    const fiveHundredReplayPromise = page.waitForResponse(
+        (response) =>
+            response.url().endsWith("/member/training") &&
+            response.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "เพิ่มประวัติการอบรม" }).click();
+    const fiveHundredReplay = await fiveHundredReplayPromise;
+    expect(fiveHundredReplay.status()).toBe(200);
+    expect(await fiveHundredReplay.json()).toMatchObject({
+        code: "idempotent-replay",
+    });
+    expect(addTrainingKeys.at(-1)).toBe(fiveHundredKey);
+    await expect(page.getByText("อบรมอานาปานสติ")).toHaveCount(1);
+    expect(successfulTrainingAuditCount()).toBe(
+        auditCountBeforeFiveHundred + 1,
+    );
+    expect(
+        await page.evaluate(
+            (operationKey) => sessionStorage.getItem(operationKey),
+            trainingOperationStorageKey,
+        ),
+    ).toBeNull();
     await page.unroute("**/member/training");
     const editTraining = page.getByRole("button", {
         name: "แก้ไข อบรมสติ",

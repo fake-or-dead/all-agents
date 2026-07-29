@@ -13,7 +13,7 @@ return new class extends Migration
             $table->uuid('account_id');
             $table->uuid('person_id');
             $table->string('idempotency_key', 128);
-            $table->char('payload_digest', 64);
+            $table->text('payload_encrypted');
             $table->uuid('training_id')->nullable();
             $table->timestampsTz();
 

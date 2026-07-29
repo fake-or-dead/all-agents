@@ -10,6 +10,7 @@ use App\Modules\People\Data\MutationResult;
 use App\Modules\People\Data\ProfileUpdate;
 use App\Modules\People\Data\TrainingUpdate;
 use Closure;
+use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Str;
 
@@ -19,6 +20,7 @@ final readonly class TransactionalMemberProfileMutations implements MemberProfil
         private ConnectionInterface $database,
         private MemberProfiles $profiles,
         private ProfileActivityRecorder $activity,
+        private Encrypter $encrypter,
     ) {}
 
     public function updateProfile(string $accountId, ProfileUpdate $command): MutationResult
@@ -46,18 +48,18 @@ final readonly class TransactionalMemberProfileMutations implements MemberProfil
         TrainingUpdate $command,
         string $idempotencyKey,
     ): MutationResult {
-        $payloadDigest = hash('sha256', json_encode([
+        $canonicalPayload = json_encode([
             'course_name' => $command->courseName,
             'provider_name' => $command->providerName,
             'started_on' => $command->startedOn->toDateString(),
             'ended_on' => $command->endedOn?->toDateString(),
-        ], JSON_THROW_ON_ERROR));
+        ], JSON_THROW_ON_ERROR);
 
         return $this->database->transaction(function () use (
             $accountId,
             $command,
             $idempotencyKey,
-            $payloadDigest,
+            $canonicalPayload,
         ): MutationResult {
             $now = now();
             $claimId = (string) Str::uuid();
@@ -68,7 +70,10 @@ final readonly class TransactionalMemberProfileMutations implements MemberProfil
                     'account_id' => $accountId,
                     'person_id' => $command->personId,
                     'idempotency_key' => $idempotencyKey,
-                    'payload_digest' => $payloadDigest,
+                    'payload_encrypted' => $this->encrypter->encrypt(
+                        $canonicalPayload,
+                        false,
+                    ),
                     'training_id' => null,
                     'created_at' => $now,
                     'updated_at' => $now,
@@ -82,9 +87,15 @@ final readonly class TransactionalMemberProfileMutations implements MemberProfil
                     ->where('idempotency_key', $idempotencyKey)
                     ->lockForUpdate()
                     ->first();
+                $existingPayload = $existing === null
+                    ? null
+                    : $this->encrypter->decrypt(
+                        (string) $existing->payload_encrypted,
+                        false,
+                    );
                 if (
-                    $existing === null
-                    || ! hash_equals((string) $existing->payload_digest, $payloadDigest)
+                    ! is_string($existingPayload)
+                    || ! hash_equals($existingPayload, $canonicalPayload)
                 ) {
                     return MutationResult::idempotencyConflict();
                 }

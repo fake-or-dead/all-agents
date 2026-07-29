@@ -8,6 +8,7 @@ use App\Modules\People\Contracts\PersonIdentityDirectory;
 use App\Modules\People\Data\IdentityClaim;
 use App\Modules\People\Data\TrainingUpdate;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -261,6 +262,19 @@ final class MemberCenterTest extends TestCase
             ->postJson('/member/training', $payload)
             ->assertCreated()
             ->json('training');
+        $firstClaim = DB::table('person_training_idempotency')
+            ->where('account_id', $accountId)
+            ->where('person_id', $personId)
+            ->where('idempotency_key', $key)
+            ->first();
+        self::assertNotNull($firstClaim);
+        self::assertObjectHasProperty('payload_encrypted', $firstClaim);
+        self::assertObjectNotHasProperty('payload_digest', $firstClaim);
+        $firstCiphertext = (string) $firstClaim->payload_encrypted;
+        $serializedClaim = json_encode($firstClaim, JSON_THROW_ON_ERROR);
+        foreach (array_values($payload) as $plaintextValue) {
+            self::assertStringNotContainsString($plaintextValue, $serializedClaim);
+        }
         $replayed = $this->asAccount($accountId)
             ->withHeader('Idempotency-Key', $key)
             ->postJson('/member/training', $payload)
@@ -307,6 +321,22 @@ final class MemberCenterTest extends TestCase
             ->postJson('/member/training', $payload)
             ->assertCreated()
             ->json('training');
+        $secondCiphertext = DB::table('person_training_idempotency')
+            ->where('account_id', $accountId)
+            ->where('person_id', $personId)
+            ->where('idempotency_key', 'training-member-idempotency-distinct')
+            ->value('payload_encrypted');
+        self::assertIsString($secondCiphertext);
+        self::assertNotSame($firstCiphertext, $secondCiphertext);
+        $encrypter = $this->app->make(Encrypter::class);
+        $firstPayload = $encrypter->decrypt($firstCiphertext, false);
+        $secondPayload = $encrypter->decrypt($secondCiphertext, false);
+        self::assertIsString($firstPayload);
+        self::assertIsString($secondPayload);
+        self::assertSame(
+            $firstPayload,
+            $secondPayload,
+        );
         self::assertNotSame($created['id'], $distinct['id']);
         self::assertSame(
             2,
@@ -404,6 +434,37 @@ final class MemberCenterTest extends TestCase
                     ->where('action', 'people.training.added')
                     ->where('outcome', 'succeeded')
                     ->count(),
+            );
+            $claim = DB::table('person_training_idempotency')
+                ->where('account_id', $accountId)
+                ->where('person_id', $personId)
+                ->where('idempotency_key', $idempotencyKey)
+                ->sole();
+            $ciphertext = (string) $claim->payload_encrypted;
+            foreach ([
+                'หลักสูตรพร้อมกัน',
+                'ศูนย์พร้อมกัน',
+                '2025-07-10',
+                '2025-07-12',
+            ] as $plaintextValue) {
+                self::assertStringNotContainsString($plaintextValue, $ciphertext);
+            }
+            self::assertSame(
+                [
+                    'course_name' => 'หลักสูตรพร้อมกัน',
+                    'provider_name' => 'ศูนย์พร้อมกัน',
+                    'started_on' => '2025-07-10',
+                    'ended_on' => '2025-07-12',
+                ],
+                json_decode(
+                    (string) $this->app->make(Encrypter::class)->decrypt(
+                        $ciphertext,
+                        false,
+                    ),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR,
+                ),
             );
         } finally {
             @unlink($resultFile);

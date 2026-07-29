@@ -11,6 +11,65 @@ type ReferenceItem = {
 type ReferenceLoadState = "idle" | "loading" | "error";
 type ReferenceParentType = "province" | "amphoe";
 
+const trainingOperationStorageKey =
+    "tapoda.member.training-add.idempotency-key.v1";
+const uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function readTrainingOperationKey(): string | null {
+    if (typeof window === "undefined") return null;
+
+    try {
+        const value = window.sessionStorage.getItem(
+            trainingOperationStorageKey,
+        );
+        if (value === null || uuidPattern.test(value)) return value;
+        window.sessionStorage.removeItem(trainingOperationStorageKey);
+    } catch {
+        return null;
+    }
+
+    return null;
+}
+
+function createTrainingOperationKey(): string | null {
+    if (typeof window === "undefined") return null;
+
+    const existing = readTrainingOperationKey();
+    if (existing !== null) return existing;
+
+    try {
+        const value = window.crypto.randomUUID();
+        window.sessionStorage.setItem(trainingOperationStorageKey, value);
+
+        return window.sessionStorage.getItem(trainingOperationStorageKey) ===
+            value
+            ? value
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+function clearTrainingOperationKey(expected: string): boolean {
+    if (typeof window === "undefined") return false;
+
+    try {
+        if (
+            window.sessionStorage.getItem(trainingOperationStorageKey) ===
+            expected
+        ) {
+            window.sessionStorage.removeItem(trainingOperationStorageKey);
+        }
+        return (
+            window.sessionStorage.getItem(trainingOperationStorageKey) === null
+        );
+    } catch {
+        // A failed storage cleanup cannot authorize a replacement operation.
+        return false;
+    }
+}
+
 function parseReferenceEnvelope(
     value: unknown,
     expectedParentType: ReferenceParentType,
@@ -206,7 +265,12 @@ export default function Center(props: Props) {
                 result.status === 422
                     ? String(result.body.message ?? "กรุณาตรวจสอบข้อมูลที่ระบุ")
                     : result.status === 409
-                      ? "ข้อมูลถูกแก้ไขจากอุปกรณ์อื่น กรุณาโหลดใหม่"
+                      ? result.body.code === "idempotency-conflict"
+                          ? String(
+                                result.body.message ??
+                                    "คีย์คำขอนี้ถูกใช้กับข้อมูลอื่นแล้ว",
+                            )
+                          : "ข้อมูลถูกแก้ไขจากอุปกรณ์อื่น กรุณาโหลดใหม่"
                       : String(result.body.message ?? "บันทึกข้อมูลไม่สำเร็จ"),
             );
             const firstField = Object.keys(fieldErrors)[0];
@@ -298,7 +362,13 @@ export default function Center(props: Props) {
                             validation={validation}
                             add={(item) =>
                                 setTraining((current) =>
-                                    [...current, item].sort((a, b) =>
+                                    [
+                                        ...current.filter(
+                                            (candidate) =>
+                                                candidate.id !== item.id,
+                                        ),
+                                        item,
+                                    ].sort((a, b) =>
                                         b.startedOn.localeCompare(a.startedOn),
                                     ),
                                 )
@@ -915,10 +985,12 @@ function TrainingPanel({
     replace: (training: Training) => void;
 }) {
     const [editingId, setEditingId] = useState<string | null>(null);
-    const pendingAdd = useRef<{
-        fingerprint: string;
-        idempotencyKey: string;
-    } | null>(null);
+    const [initialPendingAdd] = useState(readTrainingOperationKey);
+    const pendingAdd = useRef<string | null>(initialPendingAdd);
+    const [recoveredPendingAdd, setRecoveredPendingAdd] = useState(
+        initialPendingAdd !== null,
+    );
+    const [pendingAddConflict, setPendingAddConflict] = useState(false);
 
     return (
         <>
@@ -1065,32 +1137,63 @@ function TrainingPanel({
                     begin();
                     const form = event.currentTarget;
                     const values = formValues(form);
-                    const fingerprint = JSON.stringify(values);
-                    if (pendingAdd.current?.fingerprint !== fingerprint) {
-                        pendingAdd.current = {
-                            fingerprint,
-                            idempotencyKey: crypto.randomUUID(),
-                        };
+                    const idempotencyKey =
+                        pendingAdd.current ?? createTrainingOperationKey();
+                    if (idempotencyKey === null) {
+                        finish(
+                            {
+                                ok: false,
+                                status: 0,
+                                body: {
+                                    message:
+                                        "อุปกรณ์นี้ไม่สามารถเก็บคีย์คำขอได้ จึงยังไม่ส่งข้อมูล",
+                                },
+                            },
+                            () => {},
+                            form,
+                        );
+                        return;
                     }
-                    const idempotencyKey = pendingAdd.current.idempotencyKey;
+                    pendingAdd.current = idempotencyKey;
                     void requestJson(
                         "/member/training",
                         csrfToken,
                         values,
                         "POST",
                         { "Idempotency-Key": idempotencyKey },
-                    ).then((result) => {
-                        if (result.status !== 0) {
-                            pendingAdd.current = null;
+                    ).then((response) => {
+                        const value = response.body.training;
+                        const confirmedTraining =
+                            response.ok &&
+                            isRecord(value) &&
+                            typeof value.id === "string";
+                        const result =
+                            response.ok && !confirmedTraining
+                                ? {
+                                      ok: false,
+                                      status: 0,
+                                      body: {
+                                          message:
+                                              "ระบบตอบกลับไม่สมบูรณ์ กรุณาโหลดใหม่เพื่อตรวจสอบรายการ",
+                                      },
+                                  }
+                                : response;
+                        if (confirmedTraining) {
+                            if (clearTrainingOperationKey(idempotencyKey)) {
+                                pendingAdd.current = null;
+                                setRecoveredPendingAdd(false);
+                                setPendingAddConflict(false);
+                            }
+                        } else if (
+                            result.status === 409 &&
+                            result.body.code === "idempotency-conflict"
+                        ) {
+                            setPendingAddConflict(true);
                         }
                         finish(
                             result,
                             () => {
-                                const value = result.body.training;
-                                if (
-                                    typeof value === "object" &&
-                                    value !== null
-                                ) {
+                                if (confirmedTraining) {
                                     add(value as Training);
                                     form.reset();
                                 }
@@ -1101,6 +1204,12 @@ function TrainingPanel({
                 }}
             >
                 <h3>เพิ่มประวัติ</h3>
+                {recoveredPendingAdd && (
+                    <p className="form-status" role="status">
+                        พบคำขอเดิม กรุณาตรวจสอบรายการล่าสุด
+                        แล้วกรอกข้อมูลเดิมเพื่อยืนยันผล
+                    </p>
+                )}
                 <Field
                     id="course_name"
                     inputId="add-course_name"
@@ -1146,9 +1255,34 @@ function TrainingPanel({
                         )}
                     />
                 </div>
-                <button type="submit" disabled={busy}>
-                    เพิ่มประวัติการอบรม
-                </button>
+                <div className="button-row">
+                    <button type="submit" disabled={busy}>
+                        เพิ่มประวัติการอบรม
+                    </button>
+                    {(recoveredPendingAdd || pendingAddConflict) && (
+                        <button
+                            type="button"
+                            className="button-secondary"
+                            disabled={busy}
+                            onClick={(event) => {
+                                const form = event.currentTarget.form;
+                                const idempotencyKey = pendingAdd.current;
+                                if (
+                                    idempotencyKey !== null &&
+                                    !clearTrainingOperationKey(idempotencyKey)
+                                ) {
+                                    return;
+                                }
+                                pendingAdd.current = null;
+                                setRecoveredPendingAdd(false);
+                                setPendingAddConflict(false);
+                                form?.reset();
+                            }}
+                        >
+                            ตรวจสอบรายการแล้ว เริ่มคำขอใหม่
+                        </button>
+                    )}
+                </div>
             </form>
         </>
     );
