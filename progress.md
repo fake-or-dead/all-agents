@@ -47,7 +47,7 @@ browser CI, dual review, merge, and the `localhost:8080` rebuild.
 | --- | --- | --- | --- | --- |
 | 1 | Foundation + Account to `main`; remove `.scratch/tapoda-rebuild/` | Delivered | PR #39 merge `8169f11`, reviewed `71bf9af`, CI 4/4, dual reciprocal PASS | Keep as release baseline |
 | 2 | PM operating system | Delivered | PR #40 merge `9749eaec`, reviewed `daf9cd9`, CI 4/4, dual reciprocal PASS | Keep dashboard authoritative |
-| 3 | Course Catalog canonical ownership | Replacement CI 25/26; native baseline provenance fix in progress | PR #34 `d77ab7b`; run `30430189557`, browser job `90505399783`; native Catalog actual is stable `b816107d`, inspected with no overflow/clipping/lost content | Replace only Catalog baseline from exact CI actual, rerun 26/26 |
+| 3 | Course Catalog canonical ownership | Replacement CI 25/26; visual + architecture review fixes in progress | PR #34 `d77ab7b`; native baseline must use inspected `b816107d`; security comment `5114347287` proves direct owned-table reads bypass the checker | Fix owned-table gate/negative diagnostics, sync native baseline, rerun full gates |
 | 4 | Deterministic PHPStan memory gate | Delivered to integration | PR #38 merge `762ff4c`, reviewed `c62ae43`, CI 4/4, dual reciprocal PASS | Include in next `main` release |
 | 5 | Safe canonical local seed | Local review fix complete | Issue #36, `8ee0b78`, full gates and seeded runtime pass | Push, PR, CI, dual review |
 | 6 | Profile/application security | Not started | Issue #12 | Start after #34 schema lands |
@@ -58,7 +58,7 @@ browser CI, dual review, merge, and the `localhost:8080` rebuild.
 | --- | --- | --- | --- | --- |
 | Release control | PM/controller | PR #39 and PR #40 merged to `main`; exact release live on `:8080` | None | Release Course Catalog when green |
 | PM operating system | PM/controller | Delivered and active | None | Refresh dashboard at every phase boundary |
-| Course Catalog | coding + dual review agents | Auth CSS/clock fixes pass; CI 25/26 | Local-emulated Catalog baseline is not native CI pixel truth | Exact native baseline replacement, fresh CI/reviews |
+| Course Catalog | coding + dual review agents | Auth CSS/clock fixes pass; CI 25/26; new Medium posted | Native baseline provenance and incomplete owned-table architecture rules | One replacement SHA, fresh CI/reviews |
 | Local seed | coding agent | Security guard fixed; local gates pass | PR not created | Publish issue #36 branch |
 | PHPStan gate | coding/review agents complete | PR #38 merged at `762ff4c`; Issue #37 closed | None | Ship with next release |
 | Issue #12 member center | unassigned | Implementation task packet posted at Issue comment `5114102073` | Start condition is PR #34 merge | Branch from resulting integration SHA |
