@@ -2,18 +2,33 @@
 
 namespace App\Modules\People\Contracts;
 
+use App\Modules\People\Data\IdentityClaim;
+use Carbon\CarbonImmutable;
+
 interface PersonIdentityDirectory
 {
     public function create(
-        string $type,
-        string $countryCode,
-        string $normalizedIdentifier,
-        string $lookupDigest,
+        IdentityClaim $identity,
         string $givenName,
         string $familyName,
     ): string;
 
-    public function personIdForIdentifier(string $lookupDigest): ?string;
+    public function claimForAccount(
+        IdentityClaim $identity,
+        string $givenName,
+        string $familyName,
+        ?string $ownershipProof,
+        CarbonImmutable $now,
+    ): ?string;
 
-    public function identifierExists(string $lookupDigest): bool;
+    public function approveAccountLink(
+        IdentityClaim $identity,
+        CarbonImmutable $expiresAt,
+    ): ?string;
+
+    public function personIdForIdentity(IdentityClaim $identity): ?string;
+
+    public function identityExists(IdentityClaim $identity): bool;
+
+    public function rateLimitPseudonym(IdentityClaim $identity): string;
 }

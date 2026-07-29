@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Modules\IdentityAccess\Application\IdentityAccessWorkflow;
+use App\Rules\MaxUtf8Bytes;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,8 +25,13 @@ final class AccountSecurityController extends Controller
     public function updatePassword(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'current_password' => ['required', 'string', 'max:1024'],
-            'password' => ['required', 'confirmed', Password::min(12)->letters()->numbers()],
+            'current_password' => ['required', 'string', new MaxUtf8Bytes(72)],
+            'password' => [
+                'required',
+                'confirmed',
+                Password::min(12)->letters()->numbers(),
+                new MaxUtf8Bytes(72),
+            ],
         ]);
         $result = $this->identityAccess->changePassword(
             (string) Auth::id(),

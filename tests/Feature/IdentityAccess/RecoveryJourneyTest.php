@@ -3,6 +3,8 @@
 namespace Tests\Feature\IdentityAccess;
 
 use App\Modules\IdentityAccess\Infrastructure\Verification\DeterministicFakeVerificationGateway;
+use App\Modules\People\Contracts\PersonIdentityDirectory;
+use App\Modules\People\Data\IdentityClaim;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -22,10 +24,18 @@ final class RecoveryJourneyTest extends TestCase
         DB::table('auth_sessions')->insert([
             'id' => 'old-session',
             'account_id' => $accountId,
+            'credential_epoch' => 1,
             'authenticated_at' => CarbonImmutable::now(),
             'last_seen_at' => CarbonImmutable::now(),
         ]);
         $message = 'หากมีบัญชีที่ตรงกัน ระบบได้ส่งวิธีกู้คืนให้แล้ว';
+
+        $this->postJson('/signin', [
+            'identity_type' => 'personal_id',
+            'identity_number' => '1234567890123',
+            'password' => 'old-password-123',
+        ])->assertOk();
+        $this->assertAuthenticated();
 
         $this->postJson('/forgot', ['email' => 'unknown@example.test'])
             ->assertAccepted()
@@ -43,9 +53,16 @@ final class RecoveryJourneyTest extends TestCase
             ->latestRecoveryPathFor($email);
         $this->assertNotNull($path);
         $this->getJson('/local/verification-mailbox/recovery?email='.urlencode($email))
-            ->assertOk()
-            ->assertExactJson(['path' => $path]);
+            ->assertNotFound();
         $token = basename($path);
+        $this->get("/recover/{$token}")
+            ->assertOk()
+            ->assertHeader('Referrer-Policy', 'no-referrer')
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+        $this->assertStringContainsString(
+            'no-store',
+            (string) $this->get("/recover/{$token}")->headers->get('Cache-Control'),
+        );
 
         $this->postJson("/recover/{$token}", [
             'password' => 'new-password-456',
@@ -58,6 +75,8 @@ final class RecoveryJourneyTest extends TestCase
             'id' => 'old-session',
             'revoked_reason' => 'credential_recovery',
         ]);
+        $this->get('/account')->assertRedirect('/signin');
+        $this->assertGuest();
 
         $this->postJson("/recover/{$token}", [
             'password' => 'another-password-789',
@@ -105,33 +124,25 @@ final class RecoveryJourneyTest extends TestCase
 
     private function createAccount(string $email, string $identity, string $password): string
     {
-        $personId = (string) Str::uuid();
+        $personId = $this->app->make(PersonIdentityDirectory::class)->create(
+            IdentityClaim::fromInput('personal_id', $identity),
+            'ทดสอบ',
+            'กู้คืน',
+        );
         $accountId = (string) Str::uuid();
         $now = CarbonImmutable::now();
-        $key = (string) config('identity-access.identifier_key');
-
-        DB::table('people')->insert([
-            'id' => $personId,
-            'given_name' => 'ทดสอบ',
-            'family_name' => 'กู้คืน',
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-        DB::table('person_identifiers')->insert([
-            'id' => (string) Str::uuid(),
-            'person_id' => $personId,
-            'type' => 'personal_id',
-            'country_code' => 'TH',
-            'identifier_encrypted' => encrypt($identity),
-            'lookup_digest' => hash_hmac('sha256', "personal_id:{$identity}", $key),
-            'last_four' => mb_substr($identity, -4),
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+        $emailKeyVersion = (string) config('identity-access.account_lookup_key_version');
+        $emailKeys = config('identity-access.account_lookup_keys');
+        $emailKey = is_array($emailKeys) ? $emailKeys[$emailKeyVersion] : '';
         DB::table('accounts')->insert([
             'id' => $accountId,
             'person_id' => $personId,
-            'email_digest' => hash_hmac('sha256', 'email:'.mb_strtolower($email), $key),
+            'email_digest_key_version' => $emailKeyVersion,
+            'email_digest' => hash_hmac(
+                'sha256',
+                'email:'.mb_strtolower($email),
+                $emailKey,
+            ),
             'email_encrypted' => encrypt($email),
             'status' => 'active',
             'created_at' => $now,

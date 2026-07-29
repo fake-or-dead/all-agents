@@ -57,7 +57,15 @@ RUN npm run build
 
 FROM php-base AS test
 
-ENV APP_ENV=testing
+ENV APP_ENV=testing \
+    PEOPLE_IDENTIFIER_LOOKUP_KEY_VERSION=v1 \
+    PEOPLE_IDENTIFIER_LOOKUP_KEY=people-image-test-key-11111111111111111111111111 \
+    IDENTITY_ACCOUNT_LOOKUP_KEY_VERSION=v1 \
+    IDENTITY_ACCOUNT_LOOKUP_KEY=account-image-test-key-2222222222222222222222222 \
+    IDENTITY_RATE_LIMIT_KEY_VERSION=v1 \
+    IDENTITY_RATE_LIMIT_KEY=rate-image-test-key-33333333333333333333333333333 \
+    IDENTITY_VERIFICATION_ADAPTER=deterministic-fake \
+    IDENTITY_DETERMINISTIC_CODE=246810
 
 COPY --from=php-test-dependencies /app/vendor ./vendor
 COPY --from=frontend-build /app/public/build ./public/build

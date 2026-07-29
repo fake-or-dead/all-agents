@@ -2,13 +2,17 @@
 
 namespace App\Modules\IdentityAccess\Application;
 
+use App\Modules\DocumentsConsent\Contracts\ConsentAcceptanceService;
 use App\Modules\IdentityAccess\Contracts\SecurityEventRecorder;
 use App\Modules\IdentityAccess\Contracts\VerificationGateway;
 use App\Modules\IdentityAccess\Data\IdentityAccessResult;
+use App\Modules\IdentityAccess\Infrastructure\ConstantWorkPasswordVerifier;
 use App\Modules\People\Contracts\PersonIdentityDirectory;
+use App\Modules\People\Data\IdentityClaim;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -24,12 +28,15 @@ final readonly class IdentityAccessWorkflow
         private SecurityEventRecorder $securityEvents,
         private Encrypter $encrypter,
         private PersonIdentityDirectory $people,
+        private ConstantWorkPasswordVerifier $passwordVerifier,
+        private ConsentAcceptanceService $consents,
     ) {}
 
     public function requestEmailVerification(string $email, string $correlationId): void
     {
         $normalized = $this->normalizeEmail($email);
-        $digest = $this->digest('email', $normalized);
+        [$digestVersion, $digest] = $this->currentAccountDigest($normalized);
+        $digestCandidates = $this->accountDigestCandidates($normalized);
         $now = CarbonImmutable::now();
         $challengeId = (string) Str::uuid();
 
@@ -37,18 +44,27 @@ final readonly class IdentityAccessWorkflow
             $challengeId,
             $correlationId,
             $digest,
+            $digestCandidates,
+            $digestVersion,
             $normalized,
             $now,
         ): void {
-            $this->database
+            ksort($digestCandidates);
+
+            foreach ($digestCandidates as $candidateDigest) {
+                $this->lockChallengeSubject('registration', $candidateDigest, $now);
+            }
+
+            $activeChallenges = $this->database
                 ->table('verification_challenges')
                 ->where('purpose', 'registration')
-                ->where('identifier_digest', $digest)
                 ->whereNull('consumed_at')
-                ->whereNull('invalidated_at')
+                ->whereNull('invalidated_at');
+            $this->applyDigestCandidates($activeChallenges, $digestCandidates)
                 ->update([
                     'invalidated_at' => $now,
                     'invalidated_reason' => 'resend',
+                    'active_slot' => null,
                     'updated_at' => $now,
                 ]);
 
@@ -57,6 +73,7 @@ final readonly class IdentityAccessWorkflow
             $this->database->table('verification_challenges')->insert([
                 'id' => $challengeId,
                 'purpose' => 'registration',
+                'identifier_key_version' => $digestVersion,
                 'identifier_digest' => $digest,
                 'secret_hash' => Hash::make($code),
                 'attempts_remaining' => (int) config('identity-access.challenge_attempts'),
@@ -85,21 +102,23 @@ final readonly class IdentityAccessWorkflow
         string $code,
         string $correlationId,
     ): IdentityAccessResult {
-        $digest = $this->digest('email', $this->normalizeEmail($email));
+        $emailDigests = $this->accountDigestCandidates($this->normalizeEmail($email));
         $now = CarbonImmutable::now();
 
         return $this->database->transaction(function () use (
             $code,
             $correlationId,
-            $digest,
+            $emailDigests,
             $now,
         ): IdentityAccessResult {
-            $challenge = $this->database
+            $challengeQuery = $this->database
                 ->table('verification_challenges')
                 ->where('purpose', 'registration')
-                ->where('identifier_digest', $digest)
                 ->whereNull('consumed_at')
                 ->whereNull('invalidated_at')
+                ->whereNull('verified_at');
+            $this->applyDigestCandidates($challengeQuery, $emailDigests);
+            $challenge = $challengeQuery
                 ->latest('created_at')
                 ->lockForUpdate()
                 ->first();
@@ -135,6 +154,7 @@ final readonly class IdentityAccessWorkflow
                 if ($remaining === 0) {
                     $updates['invalidated_at'] = $now;
                     $updates['invalidated_reason'] = 'attempts_exhausted';
+                    $updates['active_slot'] = null;
                 }
 
                 $this->database
@@ -157,6 +177,7 @@ final readonly class IdentityAccessWorkflow
                 ->where('id', $challenge->id)
                 ->update([
                     'proof_digest' => hash('sha256', $registrationToken),
+                    'secret_hash' => null,
                     'verified_at' => $now,
                     'updated_at' => $now,
                 ]);
@@ -187,18 +208,19 @@ final readonly class IdentityAccessWorkflow
      *   given_name:string,
      *   family_name:string,
      *   password:string,
-     *   consent_version:string
+     *   consent_version:string,
+     *   person_link_token?:string|null
      * }  $input
      */
     public function register(array $input, string $correlationId): IdentityAccessResult
     {
         $email = $this->normalizeEmail($input['email']);
-        $emailDigest = $this->digest('email', $email);
-        $identityNumber = $this->normalizeIdentity(
+        [$emailDigestVersion, $emailDigest] = $this->currentAccountDigest($email);
+        $emailDigestCandidates = $this->accountDigestCandidates($email);
+        $identity = IdentityClaim::fromInput(
             $input['identity_type'],
             $input['identity_number'],
         );
-        $identityDigest = $this->digest($input['identity_type'], $identityNumber);
         $proofDigest = hash('sha256', $input['registration_token']);
         $now = CarbonImmutable::now();
 
@@ -207,20 +229,22 @@ final readonly class IdentityAccessWorkflow
                 $correlationId,
                 $email,
                 $emailDigest,
-                $identityDigest,
-                $identityNumber,
+                $emailDigestCandidates,
+                $emailDigestVersion,
+                $identity,
                 $input,
                 $now,
                 $proofDigest,
             ): IdentityAccessResult {
-                $challenge = $this->database
+                $challengeQuery = $this->database
                     ->table('verification_challenges')
                     ->where('purpose', 'registration')
-                    ->where('identifier_digest', $emailDigest)
                     ->where('proof_digest', $proofDigest)
                     ->whereNotNull('verified_at')
                     ->whereNull('consumed_at')
-                    ->whereNull('invalidated_at')
+                    ->whereNull('invalidated_at');
+                $this->applyDigestCandidates($challengeQuery, $emailDigestCandidates);
+                $challenge = $challengeQuery
                     ->lockForUpdate()
                     ->first();
 
@@ -239,8 +263,7 @@ final readonly class IdentityAccessWorkflow
                 }
 
                 if (
-                    $this->database->table('accounts')->where('email_digest', $emailDigest)->exists()
-                    || $this->people->identifierExists($identityDigest)
+                    $this->accountExistsForDigests($emailDigestCandidates)
                 ) {
                     $this->recordChallengeFailure(
                         $challenge->id,
@@ -252,18 +275,29 @@ final readonly class IdentityAccessWorkflow
                     return IdentityAccessResult::failure('invalid_registration');
                 }
 
-                $personId = $this->people->create(
-                    $input['identity_type'],
-                    $input['identity_type'] === 'personal_id' ? 'TH' : 'ZZ',
-                    $identityNumber,
-                    $identityDigest,
+                $personId = $this->people->claimForAccount(
+                    $identity,
                     $input['given_name'],
                     $input['family_name'],
+                    $input['person_link_token'] ?? null,
+                    $now,
                 );
+
+                if ($personId === null) {
+                    $this->recordChallengeFailure(
+                        $challenge->id,
+                        'account.registration',
+                        'ownership_proof_required',
+                        $correlationId,
+                    );
+
+                    return IdentityAccessResult::failure('invalid_registration');
+                }
                 $accountId = (string) Str::uuid();
                 $this->database->table('accounts')->insert([
                     'id' => $accountId,
                     'person_id' => $personId,
+                    'email_digest_key_version' => $emailDigestVersion,
                     'email_digest' => $emailDigest,
                     'email_encrypted' => $this->encrypter->encrypt($email),
                     'status' => 'active',
@@ -276,22 +310,21 @@ final readonly class IdentityAccessWorkflow
                     'algorithm' => 'current',
                     'changed_at' => $now,
                 ]);
-                $this->database->table('consent_acceptances')->insert([
-                    'id' => (string) Str::uuid(),
-                    'person_id' => $personId,
-                    'document_version' => $input['consent_version'],
-                    'context' => 'registration',
-                    'evidence' => json_encode([
+                $this->consents->acceptRegistration(
+                    personId: $personId,
+                    requestedVersionId: $input['consent_version'],
+                    evidence: [
                         'method' => 'explicit_checkbox',
                         'challenge_id' => $challenge->id,
-                    ], JSON_THROW_ON_ERROR),
-                    'accepted_at' => $now,
-                ]);
+                    ],
+                    acceptedAt: $now,
+                );
                 $this->database
                     ->table('verification_challenges')
                     ->where('id', $challenge->id)
                     ->update([
                         'consumed_at' => $now,
+                        'active_slot' => null,
                         'updated_at' => $now,
                     ]);
                 $this->securityEvents->record(
@@ -309,7 +342,7 @@ final readonly class IdentityAccessWorkflow
                     'account_id' => $accountId,
                 ]);
             }, 3);
-        } catch (QueryException) {
+        } catch (QueryException|RuntimeException) {
             $this->recordChallengeFailure(
                 self::UNKNOWN_RESOURCE_ID,
                 'account.registration',
@@ -325,98 +358,131 @@ final readonly class IdentityAccessWorkflow
         string $identityType,
         string $identityNumber,
         string $password,
+        string $sessionId,
         string $correlationId,
     ): IdentityAccessResult {
-        $identityDigest = $this->digest(
+        $identity = IdentityClaim::fromInput(
             $identityType,
-            $this->normalizeIdentity($identityType, $identityNumber),
+            $identityNumber,
         );
-        $personId = $this->people->personIdForIdentifier($identityDigest);
-        $account = $this->database
-            ->table('accounts')
-            ->join('credentials', 'credentials.account_id', '=', 'accounts.id')
-            ->where('accounts.person_id', $personId ?? self::UNKNOWN_RESOURCE_ID)
-            ->where('accounts.status', 'active')
-            ->select([
-                'accounts.id',
-                'accounts.person_id',
-                'credentials.password_hash',
-                'credentials.algorithm',
-            ])
-            ->first();
+        $personId = $this->people->personIdForIdentity($identity);
 
-        $supported = $account !== null
-            && in_array($account->algorithm, ['current', 'legacy_bcrypt'], true);
-        $passwordHash = $supported
-            ? (string) $account->password_hash
-            : (string) config('identity-access.dummy_password_hash');
-        $passwordMatches = Hash::check($password, $passwordHash);
+        return $this->database->transaction(function () use (
+            $correlationId,
+            $password,
+            $personId,
+            $sessionId,
+        ): IdentityAccessResult {
+            $account = $this->database
+                ->table('accounts')
+                ->where('person_id', $personId ?? self::UNKNOWN_RESOURCE_ID)
+                ->where('status', 'active')
+                ->lockForUpdate()
+                ->first(['id', 'person_id', 'credential_epoch']);
+            $credential = $account === null
+                ? null
+                : $this->database
+                    ->table('credentials')
+                    ->where('account_id', $account->id)
+                    ->lockForUpdate()
+                    ->first();
 
-        if (! $supported || ! $passwordMatches) {
+            if (! $this->passwordVerifier->verify($credential, $password)) {
+                $this->securityEvents->record(
+                    actorType: 'visitor',
+                    actorId: 'anonymous',
+                    action: 'account.sign_in',
+                    resourceType: 'account',
+                    resourceId: self::UNKNOWN_RESOURCE_ID,
+                    outcome: 'denied',
+                    correlationId: $correlationId,
+                    context: ['reason' => 'invalid_credentials'],
+                );
+
+                return IdentityAccessResult::failure('invalid_credentials');
+            }
+
+            $rehashed = $credential->algorithm === 'legacy_bcrypt'
+                || Hash::needsRehash($credential->password_hash);
+            $now = CarbonImmutable::now();
+
+            if ($rehashed) {
+                $this->database->table('credentials')->where('account_id', $account->id)->update([
+                    'password_hash' => Hash::make($password),
+                    'algorithm' => 'current',
+                    'changed_at' => $now,
+                ]);
+            }
+
+            $this->writeAuthenticatedSession(
+                $account->id,
+                $sessionId,
+                (int) $account->credential_epoch,
+                $now,
+            );
             $this->securityEvents->record(
-                actorType: 'visitor',
-                actorId: 'anonymous',
+                actorType: 'account',
+                actorId: $account->id,
                 action: 'account.sign_in',
                 resourceType: 'account',
-                resourceId: self::UNKNOWN_RESOURCE_ID,
-                outcome: 'denied',
+                resourceId: $account->id,
+                outcome: 'succeeded',
                 correlationId: $correlationId,
-                context: ['reason' => 'invalid_credentials'],
+                context: ['credential_rehashed' => $rehashed],
             );
 
-            return IdentityAccessResult::failure('invalid_credentials');
-        }
-
-        $rehashed = $account->algorithm === 'legacy_bcrypt'
-            || Hash::needsRehash($account->password_hash);
-
-        if ($rehashed) {
-            $this->database->table('credentials')->where('account_id', $account->id)->update([
-                'password_hash' => Hash::make($password),
-                'algorithm' => 'current',
-                'changed_at' => CarbonImmutable::now(),
+            return IdentityAccessResult::success('authenticated', [
+                'account_id' => $account->id,
+                'credential_epoch' => (int) $account->credential_epoch,
             ]);
-        }
-
-        $this->securityEvents->record(
-            actorType: 'account',
-            actorId: $account->id,
-            action: 'account.sign_in',
-            resourceType: 'account',
-            resourceId: $account->id,
-            outcome: 'succeeded',
-            correlationId: $correlationId,
-            context: ['credential_rehashed' => $rehashed],
-        );
-
-        return IdentityAccessResult::success('authenticated', [
-            'account_id' => $account->id,
-        ]);
+        });
     }
 
     public function recordAuthenticatedSession(string $accountId, string $sessionId): void
     {
-        $now = CarbonImmutable::now();
-        $this->database->table('auth_sessions')->updateOrInsert(
-            ['id' => $sessionId],
-            [
-                'account_id' => $accountId,
-                'authenticated_at' => $now,
-                'last_seen_at' => $now,
-                'revoked_at' => null,
-                'revoked_reason' => null,
-            ],
-        );
+        $this->database->transaction(function () use ($accountId, $sessionId): void {
+            $epoch = $this->database
+                ->table('accounts')
+                ->where('id', $accountId)
+                ->where('status', 'active')
+                ->lockForUpdate()
+                ->value('credential_epoch');
+
+            if (! is_numeric($epoch)) {
+                throw new RuntimeException('Cannot record a session for an inactive account.');
+            }
+
+            $this->writeAuthenticatedSession(
+                $accountId,
+                $sessionId,
+                (int) $epoch,
+                CarbonImmutable::now(),
+            );
+        });
     }
 
     public function touchSession(string $accountId, string $sessionId): bool
     {
-        return $this->database
-            ->table('auth_sessions')
-            ->where('id', $sessionId)
-            ->where('account_id', $accountId)
-            ->whereNull('revoked_at')
-            ->update(['last_seen_at' => CarbonImmutable::now()]) === 1;
+        return $this->database->transaction(function () use ($accountId, $sessionId): bool {
+            $epoch = $this->database
+                ->table('accounts')
+                ->where('id', $accountId)
+                ->where('status', 'active')
+                ->lockForUpdate()
+                ->value('credential_epoch');
+
+            if (! is_numeric($epoch)) {
+                return false;
+            }
+
+            return $this->database
+                ->table('auth_sessions')
+                ->where('id', $sessionId)
+                ->where('account_id', $accountId)
+                ->where('credential_epoch', (int) $epoch)
+                ->whereNull('revoked_at')
+                ->update(['last_seen_at' => CarbonImmutable::now()]) === 1;
+        });
     }
 
     public function signOut(
@@ -458,12 +524,12 @@ final readonly class IdentityAccessWorkflow
     public function requestRecovery(string $email, string $correlationId): void
     {
         $normalized = $this->normalizeEmail($email);
-        $digest = $this->digest('email', $normalized);
-        $accountId = $this->database
-            ->table('accounts')
-            ->where('email_digest', $digest)
-            ->where('status', 'active')
-            ->value('id');
+        $digestCandidates = $this->accountDigestCandidates($normalized);
+        $account = $this->accountForEmailDigests($digestCandidates);
+        $accountId = $account?->id;
+        [$digestVersion, $digest] = $account !== null
+            ? [$account->email_digest_key_version, $account->email_digest]
+            : $this->currentAccountDigest($normalized);
 
         $token = Str::random(72);
         $now = CarbonImmutable::now();
@@ -474,10 +540,12 @@ final readonly class IdentityAccessWorkflow
             $challengeId,
             $correlationId,
             $digest,
+            $digestVersion,
             $normalized,
             $now,
             $token,
         ): void {
+            $this->lockChallengeSubject('recovery', $digest, $now);
             $this->database
                 ->table('verification_challenges')
                 ->where('purpose', 'recovery')
@@ -487,11 +555,13 @@ final readonly class IdentityAccessWorkflow
                 ->update([
                     'invalidated_at' => $now,
                     'invalidated_reason' => 'resend',
+                    'active_slot' => null,
                     'updated_at' => $now,
                 ]);
             $this->database->table('verification_challenges')->insert([
                 'id' => $challengeId,
                 'purpose' => 'recovery',
+                'identifier_key_version' => $digestVersion,
                 'identifier_digest' => $digest,
                 'token_digest' => hash('sha256', $token),
                 'attempts_remaining' => 1,
@@ -555,13 +625,14 @@ final readonly class IdentityAccessWorkflow
                 return IdentityAccessResult::failure('invalid_recovery');
             }
 
-            $accountId = $this->database
+            $account = $this->database
                 ->table('accounts')
                 ->where('email_digest', $challenge->identifier_digest)
                 ->where('status', 'active')
-                ->value('id');
+                ->lockForUpdate()
+                ->first(['id', 'credential_epoch']);
 
-            if (! is_string($accountId)) {
+            if ($account === null) {
                 $this->invalidateChallenge($challenge->id, 'account_unavailable', $now);
                 $this->recordChallengeFailure(
                     $challenge->id,
@@ -572,11 +643,34 @@ final readonly class IdentityAccessWorkflow
 
                 return IdentityAccessResult::failure('invalid_recovery');
             }
+            $accountId = $account->id;
+            $credential = $this->database
+                ->table('credentials')
+                ->where('account_id', $accountId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($credential === null) {
+                $this->invalidateChallenge($challenge->id, 'credential_unavailable', $now);
+                $this->recordChallengeFailure(
+                    $challenge->id,
+                    'account.recovery.redeemed',
+                    'credential_unavailable',
+                    $correlationId,
+                );
+
+                return IdentityAccessResult::failure('invalid_recovery');
+            }
+            $nextEpoch = (int) $account->credential_epoch + 1;
 
             $this->database->table('credentials')->where('account_id', $accountId)->update([
                 'password_hash' => Hash::make($password),
                 'algorithm' => 'current',
                 'changed_at' => $now,
+            ]);
+            $this->database->table('accounts')->where('id', $accountId)->update([
+                'credential_epoch' => $nextEpoch,
+                'updated_at' => $now,
             ]);
             $this->database
                 ->table('auth_sessions')
@@ -591,6 +685,7 @@ final readonly class IdentityAccessWorkflow
                 ->where('id', $challenge->id)
                 ->update([
                     'consumed_at' => $now,
+                    'active_slot' => null,
                     'updated_at' => $now,
                 ]);
             $this->securityEvents->record(
@@ -615,42 +710,64 @@ final readonly class IdentityAccessWorkflow
         string $currentSessionId,
         string $correlationId,
     ): IdentityAccessResult {
-        $credential = $this->database
-            ->table('credentials')
-            ->where('account_id', $accountId)
-            ->first();
-
-        if (
-            $credential === null
-            || ! in_array($credential->algorithm, ['current', 'legacy_bcrypt'], true)
-            || ! Hash::check($currentPassword, $credential->password_hash)
-        ) {
-            $this->securityEvents->record(
-                actorType: 'account',
-                actorId: $accountId,
-                action: 'account.password.changed',
-                resourceType: 'account',
-                resourceId: $accountId,
-                outcome: 'denied',
-                correlationId: $correlationId,
-                context: ['reason' => 'invalid_current_credential'],
-            );
-
-            return IdentityAccessResult::failure('invalid_credentials');
-        }
-
         $now = CarbonImmutable::now();
-        $this->database->transaction(function () use (
+
+        return $this->database->transaction(function () use (
             $accountId,
             $correlationId,
+            $currentPassword,
             $currentSessionId,
             $newPassword,
             $now,
-        ): void {
+        ): IdentityAccessResult {
+            $account = $this->database
+                ->table('accounts')
+                ->where('id', $accountId)
+                ->where('status', 'active')
+                ->lockForUpdate()
+                ->first(['id', 'credential_epoch']);
+            $credential = $this->database
+                ->table('credentials')
+                ->where('account_id', $accountId)
+                ->lockForUpdate()
+                ->first();
+            $currentSession = $this->database
+                ->table('auth_sessions')
+                ->where('id', $currentSessionId)
+                ->where('account_id', $accountId)
+                ->whereNull('revoked_at')
+                ->lockForUpdate()
+                ->first();
+
+            if (
+                $account === null
+                || $currentSession === null
+                || (int) $currentSession->credential_epoch !== (int) $account->credential_epoch
+                || ! $this->passwordVerifier->verify($credential, $currentPassword)
+            ) {
+                $this->securityEvents->record(
+                    actorType: 'account',
+                    actorId: $accountId,
+                    action: 'account.password.changed',
+                    resourceType: 'account',
+                    resourceId: $accountId,
+                    outcome: 'denied',
+                    correlationId: $correlationId,
+                    context: ['reason' => 'invalid_current_credential'],
+                );
+
+                return IdentityAccessResult::failure('invalid_credentials');
+            }
+            $nextEpoch = (int) $account->credential_epoch + 1;
+
             $this->database->table('credentials')->where('account_id', $accountId)->update([
                 'password_hash' => Hash::make($newPassword),
                 'algorithm' => 'current',
                 'changed_at' => $now,
+            ]);
+            $this->database->table('accounts')->where('id', $accountId)->update([
+                'credential_epoch' => $nextEpoch,
+                'updated_at' => $now,
             ]);
             $this->database
                 ->table('auth_sessions')
@@ -660,6 +777,14 @@ final readonly class IdentityAccessWorkflow
                 ->update([
                     'revoked_at' => $now,
                     'revoked_reason' => 'credential_change',
+                ]);
+            $this->database
+                ->table('auth_sessions')
+                ->where('id', $currentSessionId)
+                ->where('account_id', $accountId)
+                ->update([
+                    'credential_epoch' => $nextEpoch,
+                    'last_seen_at' => $now,
                 ]);
             $this->securityEvents->record(
                 actorType: 'account',
@@ -671,9 +796,11 @@ final readonly class IdentityAccessWorkflow
                 correlationId: $correlationId,
                 context: ['other_sessions_revoked' => true],
             );
-        });
 
-        return IdentityAccessResult::success('password_changed');
+            return IdentityAccessResult::success('password_changed', [
+                'credential_epoch' => $nextEpoch,
+            ]);
+        });
     }
 
     public function recordRateLimited(string $action, string $correlationId): void
@@ -690,6 +817,25 @@ final readonly class IdentityAccessWorkflow
         );
     }
 
+    private function writeAuthenticatedSession(
+        string $accountId,
+        string $sessionId,
+        int $credentialEpoch,
+        CarbonImmutable $now,
+    ): void {
+        $this->database->table('auth_sessions')->updateOrInsert(
+            ['id' => $sessionId],
+            [
+                'account_id' => $accountId,
+                'credential_epoch' => $credentialEpoch,
+                'authenticated_at' => $now,
+                'last_seen_at' => $now,
+                'revoked_at' => null,
+                'revoked_reason' => null,
+            ],
+        );
+    }
+
     private function invalidateChallenge(
         string $challengeId,
         string $reason,
@@ -702,8 +848,27 @@ final readonly class IdentityAccessWorkflow
             ->update([
                 'invalidated_at' => $now,
                 'invalidated_reason' => $reason,
+                'active_slot' => null,
                 'updated_at' => $now,
             ]);
+    }
+
+    private function lockChallengeSubject(
+        string $purpose,
+        string $identifierDigest,
+        CarbonImmutable $now,
+    ): void {
+        $lockKey = hash('sha256', "{$purpose}:{$identifierDigest}");
+        $this->database->table('verification_subject_locks')->insertOrIgnore([
+            'lock_key' => $lockKey,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $this->database
+            ->table('verification_subject_locks')
+            ->where('lock_key', $lockKey)
+            ->lockForUpdate()
+            ->first();
     }
 
     private function recordUnknownChallengeFailure(string $action, string $correlationId): void
@@ -743,33 +908,91 @@ final readonly class IdentityAccessWorkflow
         return mb_strtolower(trim($email));
     }
 
-    private function normalizeIdentity(string $type, string $number): string
+    /** @return array{string, string} */
+    private function currentAccountDigest(string $email): array
     {
-        $normalized = mb_strtoupper(preg_replace('/[\s-]+/u', '', trim($number)) ?? '');
+        $version = (string) config('identity-access.account_lookup_key_version');
+        $keys = $this->accountLookupKeys();
 
-        if ($type === 'personal_id' && preg_match('/^\d{13}$/', $normalized) !== 1) {
-            throw new RuntimeException('Invalid personal identity number.');
+        if (! array_key_exists($version, $keys)) {
+            throw new RuntimeException('Current account lookup key is not configured.');
         }
 
-        if ($type === 'passport' && preg_match('/^[A-Z0-9]{6,20}$/', $normalized) !== 1) {
-            throw new RuntimeException('Invalid passport number.');
-        }
-
-        if (! in_array($type, ['personal_id', 'passport'], true)) {
-            throw new RuntimeException('Unsupported identity type.');
-        }
-
-        return $normalized;
+        return [$version, hash_hmac('sha256', "email:{$email}", $keys[$version])];
     }
 
-    private function digest(string $namespace, string $value): string
+    /** @return array<string, string> */
+    private function accountDigestCandidates(string $email): array
     {
-        $key = (string) config('identity-access.identifier_key');
+        $digests = [];
 
-        if ($key === '') {
-            throw new RuntimeException('Identity identifier key is not configured.');
+        foreach ($this->accountLookupKeys() as $version => $key) {
+            $digests[$version] = hash_hmac('sha256', "email:{$email}", $key);
         }
 
-        return hash_hmac('sha256', "{$namespace}:{$value}", $key);
+        return $digests;
+    }
+
+    /** @return array<string, string> */
+    private function accountLookupKeys(): array
+    {
+        $keys = config('identity-access.account_lookup_keys');
+
+        if (! is_array($keys) || $keys === []) {
+            throw new RuntimeException('Account lookup keys are not configured.');
+        }
+
+        return $keys;
+    }
+
+    /** @param array<string, string> $digests */
+    private function accountExistsForDigests(array $digests): bool
+    {
+        return $this->applyDigestCandidates(
+            $this->database->table('accounts'),
+            $digests,
+            'email_digest_key_version',
+            'email_digest',
+        )->exists();
+    }
+
+    /** @param array<string, string> $digests */
+    private function accountForEmailDigests(array $digests): ?object
+    {
+        return $this->applyDigestCandidates(
+            $this->database->table('accounts')->where('status', 'active'),
+            $digests,
+            'email_digest_key_version',
+            'email_digest',
+        )->first(['id', 'email_digest_key_version', 'email_digest']);
+    }
+
+    /**
+     * @param  array<string, string>  $digests
+     */
+    private function applyDigestCandidates(
+        Builder $query,
+        array $digests,
+        string $versionColumn = 'identifier_key_version',
+        string $digestColumn = 'identifier_digest',
+    ): Builder {
+        return $query->where(function ($candidates) use (
+            $digestColumn,
+            $digests,
+            $versionColumn,
+        ): void {
+            foreach ($digests as $version => $digest) {
+                $candidates->orWhere(function ($candidate) use (
+                    $digest,
+                    $digestColumn,
+                    $version,
+                    $versionColumn,
+                ): void {
+                    $candidate
+                        ->where($versionColumn, $version)
+                        ->where($digestColumn, $digest);
+                });
+            }
+        });
     }
 }

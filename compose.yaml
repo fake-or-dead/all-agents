@@ -25,6 +25,14 @@ x-app-environment: &app-environment
   HORIZON_PREFIX: tapoda_local_horizon
   PLATFORM_ACTOR_ADAPTER: laravel-auth
   PLATFORM_COMPLETION_ADAPTER: ${PLATFORM_COMPLETION_ADAPTER:-deterministic-fake}
+  PEOPLE_IDENTIFIER_LOOKUP_KEY_VERSION: ${PEOPLE_IDENTIFIER_LOOKUP_KEY_VERSION:?Run bin/bootstrap-env first}
+  PEOPLE_IDENTIFIER_LOOKUP_KEY: ${PEOPLE_IDENTIFIER_LOOKUP_KEY:?Run bin/bootstrap-env first}
+  IDENTITY_ACCOUNT_LOOKUP_KEY_VERSION: ${IDENTITY_ACCOUNT_LOOKUP_KEY_VERSION:?Run bin/bootstrap-env first}
+  IDENTITY_ACCOUNT_LOOKUP_KEY: ${IDENTITY_ACCOUNT_LOOKUP_KEY:?Run bin/bootstrap-env first}
+  IDENTITY_RATE_LIMIT_KEY_VERSION: ${IDENTITY_RATE_LIMIT_KEY_VERSION:?Run bin/bootstrap-env first}
+  IDENTITY_RATE_LIMIT_KEY: ${IDENTITY_RATE_LIMIT_KEY:?Run bin/bootstrap-env first}
+  IDENTITY_VERIFICATION_ADAPTER: ${IDENTITY_VERIFICATION_ADAPTER:-deterministic-fake}
+  IDENTITY_DETERMINISTIC_CODE: ${IDENTITY_DETERMINISTIC_CODE:?Run bin/bootstrap-env first}
 
 x-restore-environment: &restore-environment
   <<: *app-environment

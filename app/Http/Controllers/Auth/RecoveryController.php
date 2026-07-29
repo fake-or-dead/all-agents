@@ -4,10 +4,11 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Modules\IdentityAccess\Application\IdentityAccessWorkflow;
+use App\Modules\IdentityAccess\Infrastructure\PrivacySafeRateLimiter;
+use App\Rules\MaxUtf8Bytes;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
@@ -17,7 +18,10 @@ final class RecoveryController extends Controller
 {
     private const NEUTRAL_MESSAGE = 'หากมีบัญชีที่ตรงกัน ระบบได้ส่งวิธีกู้คืนให้แล้ว';
 
-    public function __construct(private readonly IdentityAccessWorkflow $identityAccess) {}
+    public function __construct(
+        private readonly IdentityAccessWorkflow $identityAccess,
+        private readonly PrivacySafeRateLimiter $rateLimiter,
+    ) {}
 
     public function showRequest(): Response
     {
@@ -27,15 +31,13 @@ final class RecoveryController extends Controller
     public function request(Request $request): JsonResponse
     {
         $validated = $request->validate(['email' => ['required', 'email:rfc', 'max:254']]);
-        $rateKey = 'recovery-request:'.$request->ip().':'.hash(
-            'sha256',
-            mb_strtolower(trim($validated['email'])),
-        );
         $correlationId = (string) Str::uuid();
 
-        $accepted = RateLimiter::attempt(
-            $rateKey,
-            3,
+        $accepted = $this->rateLimiter->attemptEmail(
+            'recovery-request',
+            (string) $request->ip(),
+            $validated['email'],
+            ['client' => 10, 'identifier' => 3, 'pair' => 3, 'decay' => 60],
             function () use ($correlationId, $validated): bool {
                 $this->identityAccess->requestRecovery(
                     $validated['email'],
@@ -44,7 +46,6 @@ final class RecoveryController extends Controller
 
                 return true;
             },
-            60,
         );
 
         if (! $accepted) {
@@ -68,7 +69,12 @@ final class RecoveryController extends Controller
     public function redeem(Request $request, string $token): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
-            'password' => ['required', 'confirmed', Password::min(12)->letters()->numbers()],
+            'password' => [
+                'required',
+                'confirmed',
+                Password::min(12)->letters()->numbers(),
+                new MaxUtf8Bytes(72),
+            ],
         ]);
         $result = $this->identityAccess->redeemRecovery(
             $token,

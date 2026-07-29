@@ -348,6 +348,18 @@ select:focus-visible {
     background: var(--surface-page);
 }
 
+.consent-document {
+    margin-top: var(--space-6);
+    padding: var(--space-4);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-small);
+    background: var(--surface-page);
+}
+
+.consent-document p {
+    white-space: pre-wrap;
+}
+
 .auth-links a,
 .site-header a {
     color: var(--text-link);

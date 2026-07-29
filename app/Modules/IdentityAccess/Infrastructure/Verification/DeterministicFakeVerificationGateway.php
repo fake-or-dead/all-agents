@@ -53,10 +53,18 @@ final readonly class DeterministicFakeVerificationGateway implements LocalVerifi
 
     private function recipientDigest(string $email): string
     {
+        $version = (string) config('identity-access.rate_limit_key_version');
+        $keys = config('identity-access.rate_limit_keys');
+        $key = is_array($keys) ? ($keys[$version] ?? null) : null;
+
+        if (! is_string($key) || $key === '') {
+            throw new \RuntimeException('Missing local delivery pseudonym key.');
+        }
+
         return hash_hmac(
             'sha256',
             'email:'.$this->normalizeEmail($email),
-            (string) config('identity-access.identifier_key'),
+            $key,
         );
     }
 }

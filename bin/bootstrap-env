@@ -1,17 +1,40 @@
 #!/bin/sh
 set -eu
 
-if [ -f .env ]; then
-    exit 0
+if [ ! -f .env ]; then
+    cp .env.example .env
 fi
-
-cp .env.example .env
 
 php_image="php:8.5-cli-bookworm@sha256:fb740987f3e7aefd7f52d1f961fa91602874f2b6a5b0bf0105725f8987b54bee"
 app_key="$(docker run --rm "${php_image}" php -r 'echo "base64:".base64_encode(random_bytes(32));')"
 db_password="$(docker run --rm "${php_image}" php -r 'echo bin2hex(random_bytes(24));')"
+people_lookup_key="$(docker run --rm "${php_image}" php -r 'echo bin2hex(random_bytes(32));')"
+account_lookup_key="$(docker run --rm "${php_image}" php -r 'echo bin2hex(random_bytes(32));')"
+rate_limit_key="$(docker run --rm "${php_image}" php -r 'echo bin2hex(random_bytes(32));')"
+verification_code="$(docker run --rm "${php_image}" php -r 'echo random_int(100000, 999999);')"
 
-sed -i.bak "s|^APP_KEY=.*$|APP_KEY=${app_key}|" .env
-sed -i.bak "s|^DB_PASSWORD=.*$|DB_PASSWORD=${db_password}|" .env
-sed -i.bak "s|^POSTGRES_PASSWORD=.*$|POSTGRES_PASSWORD=${db_password}|" .env
-rm .env.bak
+set_if_empty() {
+    name="$1"
+    value="$2"
+
+    if ! grep -q "^${name}=" .env; then
+        printf '%s=\n' "${name}" >> .env
+    fi
+
+    if grep -q "^${name}=$" .env; then
+        sed -i.bak "s|^${name}=.*$|${name}=${value}|" .env
+    fi
+}
+
+set_if_empty APP_KEY "${app_key}"
+set_if_empty DB_PASSWORD "${db_password}"
+set_if_empty POSTGRES_PASSWORD "${db_password}"
+set_if_empty PEOPLE_IDENTIFIER_LOOKUP_KEY_VERSION "v1"
+set_if_empty PEOPLE_IDENTIFIER_LOOKUP_KEY "${people_lookup_key}"
+set_if_empty IDENTITY_ACCOUNT_LOOKUP_KEY_VERSION "v1"
+set_if_empty IDENTITY_ACCOUNT_LOOKUP_KEY "${account_lookup_key}"
+set_if_empty IDENTITY_RATE_LIMIT_KEY_VERSION "v1"
+set_if_empty IDENTITY_RATE_LIMIT_KEY "${rate_limit_key}"
+set_if_empty IDENTITY_VERIFICATION_ADAPTER "deterministic-fake"
+set_if_empty IDENTITY_DETERMINISTIC_CODE "${verification_code}"
+[ ! -f .env.bak ] || rm .env.bak

@@ -3,6 +3,8 @@
 namespace Tests\Feature\IdentityAccess;
 
 use App\Models\Account;
+use App\Modules\People\Contracts\PersonIdentityDirectory;
+use App\Modules\People\Data\IdentityClaim;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -91,6 +93,26 @@ final class AuthenticationJourneyTest extends TestCase
         ]);
     }
 
+    public function test_protected_route_captures_only_safe_intended_destination_once(): void
+    {
+        $this->createAccount('passport', 'RT123456', 'correct-password-123');
+
+        $this->get('/account?section=password')->assertRedirect('/signin');
+        $this->postJson('/signin', [
+            'identity_type' => 'passport',
+            'identity_number' => 'RT123456',
+            'password' => 'correct-password-123',
+        ])->assertOk()->assertJsonPath('redirect', '/account?section=password');
+
+        $this->postJson('/signout')->assertOk();
+        $this->get('/signin?intended=//evil.example')->assertOk();
+        $this->postJson('/signin', [
+            'identity_type' => 'passport',
+            'identity_number' => 'RT123456',
+            'password' => 'correct-password-123',
+        ])->assertOk()->assertJsonPath('redirect', '/account');
+    }
+
     public function test_sign_in_throttles_failures_without_exposing_account_existence(): void
     {
         $this->createAccount('personal_id', '1111111111111', 'correct-password-123');
@@ -131,7 +153,7 @@ final class AuthenticationJourneyTest extends TestCase
         ])->assertUnprocessable()
             ->assertJsonPath(
                 'errors.identity_number.0',
-                'รูปแบบ เลขเอกสารประจำตัว ไม่ถูกต้อง',
+                'ข้อมูลประจำตัวไม่ถูกต้อง',
             );
 
         $this->assertDatabaseCount('audit_events', 0);
@@ -152,6 +174,7 @@ final class AuthenticationJourneyTest extends TestCase
         DB::table('auth_sessions')->insert([
             'id' => 'another-device-session',
             'account_id' => $accountId,
+            'credential_epoch' => 1,
             'authenticated_at' => CarbonImmutable::now(),
             'last_seen_at' => CarbonImmutable::now(),
         ]);
@@ -189,35 +212,23 @@ final class AuthenticationJourneyTest extends TestCase
         string $password,
         string $algorithm = 'current',
     ): string {
-        $personId = (string) Str::uuid();
+        $personId = $this->app->make(PersonIdentityDirectory::class)->create(
+            IdentityClaim::fromInput($identityType, $identityNumber),
+            'ทดสอบ',
+            'ระบบ',
+        );
         $accountId = (string) Str::uuid();
         $now = CarbonImmutable::now();
-        $key = (string) config('identity-access.identifier_key');
-        $normalized = mb_strtoupper(preg_replace('/[\s-]+/u', '', $identityNumber) ?? '');
-
-        DB::table('people')->insert([
-            'id' => $personId,
-            'given_name' => 'ทดสอบ',
-            'family_name' => 'ระบบ',
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-        DB::table('person_identifiers')->insert([
-            'id' => (string) Str::uuid(),
-            'person_id' => $personId,
-            'type' => $identityType,
-            'country_code' => $identityType === 'personal_id' ? 'TH' : 'ZZ',
-            'identifier_encrypted' => encrypt($normalized),
-            'lookup_digest' => hash_hmac('sha256', "{$identityType}:{$normalized}", $key),
-            'last_four' => mb_substr($normalized, -4),
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+        $email = "{$accountId}@example.test";
+        $emailKeyVersion = (string) config('identity-access.account_lookup_key_version');
+        $emailKeys = config('identity-access.account_lookup_keys');
+        $emailKey = is_array($emailKeys) ? $emailKeys[$emailKeyVersion] : '';
         DB::table('accounts')->insert([
             'id' => $accountId,
             'person_id' => $personId,
-            'email_digest' => hash_hmac('sha256', "email:{$accountId}@example.test", $key),
-            'email_encrypted' => encrypt("{$accountId}@example.test"),
+            'email_digest_key_version' => $emailKeyVersion,
+            'email_digest' => hash_hmac('sha256', "email:{$email}", $emailKey),
+            'email_encrypted' => encrypt($email),
             'status' => 'active',
             'created_at' => $now,
             'updated_at' => $now,

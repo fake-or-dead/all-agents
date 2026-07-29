@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Modules\DocumentsConsent\Contracts\ConsentAcceptanceService;
 use App\Modules\IdentityAccess\Application\IdentityAccessWorkflow;
+use App\Modules\IdentityAccess\Infrastructure\PrivacySafeRateLimiter;
+use App\Rules\MaxUtf8Bytes;
+use App\Rules\ValidIdentityClaim;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -20,12 +23,23 @@ final class RegistrationController extends Controller
 {
     private const NEUTRAL_MESSAGE = 'หากข้อมูลถูกต้อง ระบบได้ส่งวิธียืนยันให้แล้ว';
 
-    public function __construct(private readonly IdentityAccessWorkflow $identityAccess) {}
+    public function __construct(
+        private readonly IdentityAccessWorkflow $identityAccess,
+        private readonly PrivacySafeRateLimiter $rateLimiter,
+        private readonly ConsentAcceptanceService $consents,
+    ) {}
 
     public function show(): Response
     {
+        $consent = $this->consents->currentRegistrationConsent();
+
         return Inertia::render('Auth/Register', [
-            'consentVersion' => (string) config('identity-access.registration_consent_version'),
+            'consent' => [
+                'id' => $consent->id,
+                'title' => $consent->title,
+                'versionLabel' => $consent->versionLabel,
+                'content' => $consent->content,
+            ],
             'csrfToken' => csrf_token(),
         ]);
     }
@@ -33,15 +47,13 @@ final class RegistrationController extends Controller
     public function requestVerification(Request $request): JsonResponse
     {
         $validated = $request->validate(['email' => ['required', 'email:rfc', 'max:254']]);
-        $rateKey = 'verification-request:'.$request->ip().':'.hash(
-            'sha256',
-            mb_strtolower(trim($validated['email'])),
-        );
         $correlationId = (string) Str::uuid();
 
-        $accepted = RateLimiter::attempt(
-            $rateKey,
-            3,
+        $accepted = $this->rateLimiter->attemptEmail(
+            'verification-request',
+            (string) $request->ip(),
+            $validated['email'],
+            ['client' => 10, 'identifier' => 3, 'pair' => 3, 'decay' => 60],
             function () use ($correlationId, $validated): bool {
                 $this->identityAccess->requestEmailVerification(
                     $validated['email'],
@@ -50,7 +62,6 @@ final class RegistrationController extends Controller
 
                 return true;
             },
-            60,
         );
 
         if (! $accepted) {
@@ -91,24 +102,23 @@ final class RegistrationController extends Controller
         $validated = $request->validate([
             'email' => ['required', 'email:rfc', 'max:254'],
             'registration_token' => ['required', 'string', 'min:32', 'max:128'],
+            'person_link_token' => ['nullable', 'string', 'min:32', 'max:128'],
             'identity_type' => ['required', Rule::in(['personal_id', 'passport'])],
             'identity_number' => [
                 'required',
                 'string',
-                Rule::when(
-                    $request->input('identity_type') === 'personal_id',
-                    ['regex:/^\d{13}$/'],
-                    ['regex:/^[A-Za-z0-9 -]{6,24}$/'],
-                ),
+                new ValidIdentityClaim($request->input('identity_type')),
             ],
             'given_name' => ['required', 'string', 'max:160'],
             'family_name' => ['required', 'string', 'max:160'],
-            'password' => ['required', 'confirmed', Password::min(12)->letters()->numbers()],
-            'consent_accepted' => ['accepted'],
-            'consent_version' => [
+            'password' => [
                 'required',
-                Rule::in([(string) config('identity-access.registration_consent_version')]),
+                'confirmed',
+                Password::min(12)->letters()->numbers(),
+                new MaxUtf8Bytes(72),
             ],
+            'consent_accepted' => ['accepted'],
+            'consent_version' => ['required', 'uuid'],
         ]);
         $result = $this->identityAccess->register($validated, (string) Str::uuid());
 

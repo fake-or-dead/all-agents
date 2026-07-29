@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\IdentityAccess;
 
+use App\Modules\People\Contracts\PersonIdentityDirectory;
+use App\Modules\People\Data\IdentityClaim;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +12,8 @@ use Tests\TestCase;
 final class RegistrationJourneyTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const CONSENT_VERSION_ID = '10000000-0000-4000-8000-000000000002';
 
     public function test_email_verification_is_neutral_and_only_the_latest_challenge_can_be_redeemed(): void
     {
@@ -58,7 +62,7 @@ final class RegistrationJourneyTest extends TestCase
             'password' => 'safe-password-123',
             'password_confirmation' => 'safe-password-123',
             'consent_accepted' => true,
-            'consent_version' => 'registration-consent-v1',
+            'consent_version' => self::CONSENT_VERSION_ID,
         ])->assertCreated()->assertJsonStructure(['redirect']);
 
         $this->assertAuthenticated();
@@ -67,7 +71,11 @@ final class RegistrationJourneyTest extends TestCase
         $this->assertDatabaseCount('accounts', 1);
         $this->assertDatabaseCount('credentials', 1);
         $this->assertDatabaseHas('consent_acceptances', [
-            'document_version' => 'registration-consent-v1',
+            'document_version_id' => self::CONSENT_VERSION_ID,
+            'document_checksum' => hash(
+                'sha256',
+                'เอกสารตัวอย่างสำหรับการพัฒนาภายใน: Tapoda จะใช้ข้อมูลบัญชีและข้อมูลประจำตัวเพื่อยืนยันตัวบุคคล จัดการการสมัคร และรักษาความปลอดภัยของบัญชี เอกสารนี้ไม่ใช่ข้อความกฎหมายสำหรับระบบจริง',
+            ),
             'context' => 'registration',
         ]);
         $this->assertDatabaseMissing('verification_challenges', [
@@ -99,7 +107,7 @@ final class RegistrationJourneyTest extends TestCase
             'password' => 'safe-password-123',
             'password_confirmation' => 'safe-password-123',
             'consent_accepted' => true,
-            'consent_version' => 'registration-consent-old',
+            'consent_version' => '20000000-0000-4000-8000-000000000002',
         ])->assertStatus(422);
 
         $this->assertDatabaseCount('people', 0);
@@ -155,7 +163,7 @@ final class RegistrationJourneyTest extends TestCase
             'password' => 'safe-password-123',
             'password_confirmation' => 'safe-password-123',
             'consent_accepted' => true,
-            'consent_version' => 'registration-consent-v1',
+            'consent_version' => self::CONSENT_VERSION_ID,
         ];
         $this->postJson('/signup', $payload)->assertCreated();
         $this->postJson('/signup', $payload)->assertUnprocessable();
@@ -164,6 +172,57 @@ final class RegistrationJourneyTest extends TestCase
             'action' => 'account.registration',
             'outcome' => 'denied',
         ]);
+    }
+
+    public function test_existing_person_requires_one_use_people_owned_link_proof(): void
+    {
+        $people = $this->app->make(PersonIdentityDirectory::class);
+        $identity = IdentityClaim::fromInput('passport', 'EX123456');
+        $personId = $people->create($identity, 'Existing', 'Person');
+        $registrationToken = $this->verifiedRegistrationToken('linked@example.test');
+        $payload = [
+            'email' => 'linked@example.test',
+            'registration_token' => $registrationToken,
+            'identity_type' => 'passport',
+            'identity_number' => 'EX123456',
+            'given_name' => 'Changed',
+            'family_name' => 'Name',
+            'password' => 'safe-password-123',
+            'password_confirmation' => 'safe-password-123',
+            'consent_accepted' => true,
+            'consent_version' => self::CONSENT_VERSION_ID,
+        ];
+
+        $this->postJson('/signup', $payload)->assertUnprocessable();
+        $this->assertDatabaseCount('people', 1);
+        $this->assertDatabaseCount('accounts', 0);
+
+        $proof = $people->approveAccountLink(
+            $identity,
+            CarbonImmutable::now()->addMinutes(15),
+        );
+        $this->assertNotNull($proof);
+        $this->postJson('/signup', [
+            ...$payload,
+            'person_link_token' => $proof,
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('accounts', ['person_id' => $personId]);
+        $this->assertDatabaseHas('person_account_link_proofs', [
+            'person_id' => $personId,
+        ]);
+        $this->assertNotNull(
+            DB::table('person_account_link_proofs')->value('consumed_at'),
+        );
+
+        $secondToken = $this->verifiedRegistrationToken('second-linked@example.test');
+        $this->postJson('/signup', [
+            ...$payload,
+            'email' => 'second-linked@example.test',
+            'registration_token' => $secondToken,
+            'person_link_token' => $proof,
+        ])->assertUnprocessable();
+        $this->assertDatabaseCount('accounts', 1);
     }
 
     private function verifiedRegistrationToken(string $email): string

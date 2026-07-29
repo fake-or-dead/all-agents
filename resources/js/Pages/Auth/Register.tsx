@@ -1,21 +1,45 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AuthShell from "./AuthShell";
 import { formValues, submitJson } from "./auth-http";
 
 type Props = {
-    consentVersion: string;
+    consent: {
+        id: string;
+        title: string;
+        versionLabel: string;
+        content: string;
+    };
     csrfToken: string;
 };
 
-export default function Register({ consentVersion, csrfToken }: Props) {
+export default function Register({ consent, csrfToken }: Props) {
+    const personLinkToken = new URLSearchParams(window.location.search).get(
+        "person_link_token",
+    );
     const [registrationToken, setRegistrationToken] = useState("");
+    const [verifiedEmail, setVerifiedEmail] = useState("");
+    const [proofExpiresAt, setProofExpiresAt] = useState("");
     const [status, setStatus] = useState("");
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
+    const codeInput = useRef<HTMLInputElement>(null);
+    const errorMessage = useRef<HTMLParagraphElement>(null);
+
+    function clearVerification() {
+        setRegistrationToken("");
+        setVerifiedEmail("");
+        setProofExpiresAt("");
+    }
+
+    useEffect(() => {
+        if (!error) return;
+        errorMessage.current?.focus();
+    }, [error]);
 
     async function requestCode(form: HTMLFormElement) {
         setBusy(true);
         setError("");
+        clearVerification();
         const data = formValues(form);
         const result = await submitJson(
             "/auth/verification/request",
@@ -24,6 +48,7 @@ export default function Register({ consentVersion, csrfToken }: Props) {
         );
         if (result.ok) {
             setStatus(String(result.body.message ?? ""));
+            codeInput.current?.focus();
         } else {
             setError(String(result.body.message ?? "ไม่สามารถขอรหัสได้"));
         }
@@ -42,6 +67,12 @@ export default function Register({ consentVersion, csrfToken }: Props) {
 
         if (result.ok) {
             setRegistrationToken(String(result.body.registration_token ?? ""));
+            setVerifiedEmail(
+                String(data.email ?? "")
+                    .trim()
+                    .toLowerCase(),
+            );
+            setProofExpiresAt(String(result.body.expires_at ?? ""));
             setStatus("ยืนยันอีเมลแล้ว กรุณากรอกข้อมูลบัญชีให้ครบ");
         } else {
             setError(String(result.body.message ?? "ไม่สามารถยืนยันได้"));
@@ -54,11 +85,26 @@ export default function Register({ consentVersion, csrfToken }: Props) {
         setBusy(true);
         setError("");
         const data = formValues(form);
+        if (
+            !registrationToken ||
+            verifiedEmail !==
+                String(data.email ?? "")
+                    .trim()
+                    .toLowerCase() ||
+            !proofExpiresAt ||
+            Date.parse(proofExpiresAt) <= Date.now()
+        ) {
+            clearVerification();
+            setError("การยืนยันอีเมลหมดอายุหรืออีเมลเปลี่ยน กรุณาขอรหัสใหม่");
+            setBusy(false);
+            return;
+        }
         const result = await submitJson("/signup", csrfToken, {
             ...data,
             registration_token: registrationToken,
+            person_link_token: personLinkToken,
             consent_accepted: data.consent_accepted === "yes",
-            consent_version: consentVersion,
+            consent_version: consent.id,
         });
 
         if (result.ok) {
@@ -94,6 +140,17 @@ export default function Register({ consentVersion, csrfToken }: Props) {
                         name="email"
                         type="email"
                         autoComplete="email"
+                        onChange={(event) => {
+                            if (
+                                verifiedEmail &&
+                                event.currentTarget.value
+                                    .trim()
+                                    .toLowerCase() !== verifiedEmail
+                            ) {
+                                clearVerification();
+                                setStatus("");
+                            }
+                        }}
                         required
                     />
                 </div>
@@ -107,6 +164,7 @@ export default function Register({ consentVersion, csrfToken }: Props) {
                             pattern="[0-9]{6}"
                             maxLength={6}
                             autoComplete="one-time-code"
+                            ref={codeInput}
                             required
                         />
                     </div>
@@ -215,8 +273,9 @@ export default function Register({ consentVersion, csrfToken }: Props) {
                             required
                         />
                         <span>
-                            ฉันอ่านและยอมรับเอกสารความยินยอม รุ่น{" "}
-                            <strong>{consentVersion}</strong>
+                            ฉันอ่านและยอมรับ{" "}
+                            <a href="#registration-consent">{consent.title}</a>{" "}
+                            รุ่น <strong>{consent.versionLabel}</strong>
                         </span>
                     </label>
                     <button type="submit" disabled={busy}>
@@ -224,11 +283,28 @@ export default function Register({ consentVersion, csrfToken }: Props) {
                     </button>
                 </fieldset>
             </form>
+            <section
+                id="registration-consent"
+                className="consent-document"
+                aria-labelledby="registration-consent-title"
+                tabIndex={-1}
+            >
+                <h2 id="registration-consent-title">{consent.title}</h2>
+                <p>
+                    รุ่น <strong>{consent.versionLabel}</strong>
+                </p>
+                <p>{consent.content}</p>
+            </section>
             <p className="form-status" role="status" aria-live="polite">
                 {status}
             </p>
             {error && (
-                <p className="form-error" role="alert">
+                <p
+                    className="form-error"
+                    role="alert"
+                    tabIndex={-1}
+                    ref={errorMessage}
+                >
                     {error}
                 </p>
             )}

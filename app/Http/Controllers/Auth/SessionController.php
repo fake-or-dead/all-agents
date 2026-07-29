@@ -5,11 +5,15 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Modules\IdentityAccess\Application\IdentityAccessWorkflow;
+use App\Modules\IdentityAccess\Infrastructure\PrivacySafeRateLimiter;
+use App\Modules\IdentityAccess\Infrastructure\SafeIntendedDestination;
+use App\Modules\People\Data\IdentityClaim;
+use App\Rules\MaxUtf8Bytes;
+use App\Rules\ValidIdentityClaim;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -17,20 +21,14 @@ use Inertia\Response;
 
 final class SessionController extends Controller
 {
-    public function __construct(private readonly IdentityAccessWorkflow $identityAccess) {}
+    public function __construct(
+        private readonly IdentityAccessWorkflow $identityAccess,
+        private readonly PrivacySafeRateLimiter $rateLimiter,
+        private readonly SafeIntendedDestination $destinations,
+    ) {}
 
-    public function show(Request $request): Response
+    public function show(): Response
     {
-        $intended = $request->query('intended');
-
-        if (
-            is_string($intended)
-            && str_starts_with($intended, '/')
-            && ! str_starts_with($intended, '//')
-        ) {
-            $request->session()->put('url.intended', $intended);
-        }
-
         return Inertia::render('Auth/SignIn', ['csrfToken' => csrf_token()]);
     }
 
@@ -41,21 +39,23 @@ final class SessionController extends Controller
             'identity_number' => [
                 'required',
                 'string',
-                Rule::when(
-                    $request->input('identity_type') === 'personal_id',
-                    ['regex:/^\d{13}$/'],
-                    ['regex:/^[A-Za-z0-9 -]{6,24}$/'],
-                ),
+                new ValidIdentityClaim($request->input('identity_type')),
             ],
-            'password' => ['required', 'string', 'max:1024'],
+            'password' => ['required', 'string', new MaxUtf8Bytes(72)],
         ]);
-        $rateKey = 'sign-in:'.$request->ip().':'.hash(
-            'sha256',
-            $validated['identity_type'].':'.mb_strtoupper(trim($validated['identity_number'])),
+        $identity = IdentityClaim::fromInput(
+            $validated['identity_type'],
+            $validated['identity_number'],
         );
         $correlationId = (string) Str::uuid();
 
-        if (! RateLimiter::attempt($rateKey, 5, static fn (): bool => true, 60)) {
+        if (! $this->rateLimiter->attemptIdentity(
+            'sign-in',
+            (string) $request->ip(),
+            $identity,
+            ['client' => 20, 'identifier' => 5, 'pair' => 5, 'decay' => 60],
+            static fn (): bool => true,
+        )) {
             $this->identityAccess->recordRateLimited('account.sign_in', $correlationId);
 
             return response()->json([
@@ -63,10 +63,12 @@ final class SessionController extends Controller
             ], 429);
         }
 
+        $authSessionId = Str::random(64);
         $result = $this->identityAccess->authenticate(
             $validated['identity_type'],
             $validated['identity_number'],
             $validated['password'],
+            $authSessionId,
             $correlationId,
         );
 
@@ -76,17 +78,32 @@ final class SessionController extends Controller
             ], 422);
         }
 
-        RateLimiter::clear($rateKey);
+        $this->rateLimiter->clearIdentityFailures(
+            'sign-in',
+            (string) $request->ip(),
+            $identity,
+        );
         $account = Account::query()->findOrFail($result->data['account_id']);
         Auth::login($account);
         $request->session()->regenerate();
-        $authSessionId = Str::random(64);
         $request->session()->put('identity_access.auth_session_id', $authSessionId);
-        $this->identityAccess->recordAuthenticatedSession(
+        if (! $this->identityAccess->touchSession(
             (string) $account->getAuthIdentifier(),
             $authSessionId,
-        );
-        $destination = $request->session()->pull('url.intended', route('account.home'));
+        )) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return response()->json([
+                'message' => 'ข้อมูลเข้าสู่ระบบไม่ถูกต้อง หรือบัญชีต้องกู้คืนการเข้าถึง',
+            ], 422);
+        }
+        $storedDestination = $request->session()->pull('url.intended');
+        $destination = is_string($storedDestination)
+            ? $this->destinations->accountPath($storedDestination)
+            : null;
+        $destination ??= route('account.home', absolute: false);
 
         return $request->expectsJson()
             ? response()->json(['redirect' => $destination])

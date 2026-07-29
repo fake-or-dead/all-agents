@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 
 const password = "browser-password-123";
 
@@ -40,6 +41,26 @@ async function expectNoHorizontalOverflow(page: Page) {
     ).toBe(true);
 }
 
+function recoveryPathFor(email: string): string {
+    return execFileSync(
+        "docker",
+        [
+            "compose",
+            "exec",
+            "-T",
+            "web",
+            "php",
+            "artisan",
+            "identity:local-recovery-path",
+        ],
+        {
+            cwd: process.cwd(),
+            encoding: "utf8",
+            input: `${email}\n`,
+        },
+    ).trim();
+}
+
 test("FLOW-AUTH-01 registration is Thai-first, accessible, responsive, and signs in", async ({
     page,
 }, testInfo) => {
@@ -52,9 +73,30 @@ test("FLOW-AUTH-01 registration is Thai-first, accessible, responsive, and signs
     ).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", "th");
     await expectNoHorizontalOverflow(page);
+    await expect(
+        page.getByRole("heading", {
+            name: "ความยินยอมการสร้างบัญชี (ตัวอย่างภายใน)",
+            level: 2,
+        }),
+    ).toBeVisible();
+    await expect(
+        page
+            .getByRole("region", {
+                name: "ความยินยอมการสร้างบัญชี (ตัวอย่างภายใน)",
+            })
+            .getByText("local-fixture-v1"),
+    ).toBeVisible();
     expect(
         await new AxeBuilder({ page }).include("main").analyze(),
     ).toMatchObject({ violations: [] });
+
+    await page.getByLabel("อีเมล").fill(`stale-${unique}@example.test`);
+    await page.getByRole("button", { name: "ขอรหัส" }).click();
+    await page.getByLabel("รหัสยืนยัน 6 หลัก").fill("246810");
+    await page.getByRole("button", { name: "ยืนยันรหัส" }).click();
+    await expect(page.locator("fieldset")).toBeEnabled();
+    await page.getByLabel("อีเมล").fill(`changed-${unique}@example.test`);
+    await expect(page.locator("fieldset")).toHaveAttribute("disabled", "");
 
     await registerAccount(page, unique);
     expect(
@@ -120,8 +162,14 @@ test("FLOW-AUTH-03 recovery is neutral, one-use, and revokes old credentials", a
         `${Date.now()}${testInfo.workerIndex}3`,
     );
     await page.getByRole("button", { name: "ออกจากระบบ" }).click();
+    await expect(page).toHaveURL(/\/signin$/);
+    await page.waitForLoadState("networkidle");
 
     await page.goto("/forgot");
+    await expectNoHorizontalOverflow(page);
+    expect(
+        await new AxeBuilder({ page }).include("main").analyze(),
+    ).toMatchObject({ violations: [] });
     await page.route("**/forgot", async (route) => {
         if (route.request().method() === "POST") {
             await route.fulfill({
@@ -147,13 +195,12 @@ test("FLOW-AUTH-03 recovery is neutral, one-use, and revokes old credentials", a
     await expect(page.getByRole("status")).toHaveText(
         "หากมีบัญชีที่ตรงกัน ระบบได้ส่งวิธีกู้คืนให้แล้ว",
     );
-    const mailbox = await page.request.get(
-        `/local/verification-mailbox/recovery?email=${encodeURIComponent(account.email)}`,
-    );
-    expect(mailbox.ok()).toBe(true);
-    const { path } = (await mailbox.json()) as { path: string };
+    const path = recoveryPathFor(account.email);
 
     await page.goto(path);
+    expect(
+        await new AxeBuilder({ page }).include("main").analyze(),
+    ).toMatchObject({ violations: [] });
     await page
         .getByLabel("รหัสผ่านใหม่", { exact: true })
         .fill("recovered-password-456");
