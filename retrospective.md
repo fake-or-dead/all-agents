@@ -365,3 +365,59 @@ Every active delivery hour records:
   one exact candidate, then obtain CI 4/4 and fresh reciprocal security and
   acceptance review. Do not start #51 coding; refine #57 after #50's exact
   interface is merged.
+
+### 2026-07-29 21:07 +07
+
+- Checkpoint discipline: recorded at the fixed boundary while PR #59 final
+  security review continues. CI/browser completion was not awaited.
+- Delivery output: PR #58 replacement `b4fb2e4` corrected the Docker lease
+  project, owner/consumer, and real `tools`/`restore` profile guidance. It
+  passed CI 4/4 plus dual reciprocal review and merged to `main`.
+- #50 output: exact remote SHA
+  `a11e3b1fa5a756967b0f2752d5d3b5c6acd64500` is a clean one-commit range from
+  integration `a878957`. Full backend passed 114 tests/818 assertions, real
+  service integration 34/137, PostgreSQL immutability 25/67, bidirectional
+  publication races 4/48, deterministic double seed 1/6, Pint 187 files,
+  PHPStan 115 files, architecture, Composer/frontend gates, and an independent
+  PostgreSQL security rerun 25/69.
+- Review-before-push result: acceptance found no scope/API creep. Security
+  prevented a replacement loop by finding publication/mutation races, direct
+  published insertion, child re-parenting, mutable published definition
+  identity, loose rule parameters, incomplete repeat-seed footprint, locale and
+  publication-state gaps, and committed concurrency-test contamination. All
+  were fixed and independently rechecked before the remote SHA.
+- Exact runtime result: candidate image
+  `sha256:f6220b256e0685ed57b7f4ef7dff86af52bc5b7783457e8e528b7b884d53e82c`
+  reported HTTP 200. Local configured browser produced 15 passes, four
+  runner/environment failures, and 13 dependency skips. No snapshot or
+  allowlist was changed; native GitHub browser CI is authoritative and now
+  passes as part of PR #59 CI 4/4.
+- GitHub authority incident: the coding agent could push by SSH but its
+  connector returned HTTP 403 and its local `gh` token appeared invalid. The PM
+  controller independently verified an active `repo`-scoped CLI session and
+  created PR #59 plus the Issue update. GitHub write authority is per agent/tool
+  context; a child failure must be escalated to the controller before asking the
+  user to re-authenticate.
+- Current review state: acceptance PASS is posted on exact `a11e3b1`; security
+  final review and reciprocal cross-review remain. No merge or false scope
+  completion is claimed; progress stays 12/32 until #50 reaches
+  integration/main and verified `localhost:8080`.
+- Task-sizing lesson: #50 exceeded the 60–90 minute target because one packet
+  combined schema publication, cross-table immutable state, concurrent
+  mutation serialization, deterministic fixture integrity, resolver behavior,
+  and architecture gates. Future packets must identify concurrency and
+  repeat-seed invariants during sizing. Split when both halves remain useful;
+  do not create a schema-only PR that cannot serve an independently verifiable
+  domain outcome.
+- #57 result: the final packet is cohesive at 60–90 minutes only as a
+  People-owned read-only evidence slice. It owns encrypted birth date,
+  approved/lay-monastic classification, provenance, effective/stale resolution,
+  and the deterministic local fixture. Applicant intent remains
+  ApplicationWorkflow #51; course/form composition, writers, alumni rules, UI,
+  and external acquisition are excluded and trigger new child Issues.
+- Domain correction: `Application context evidence` is now the canonical term
+  for versioned server-owned person facts. Applicant intent is not People
+  evidence and was removed from the glossary definition before publication.
+- Next-hour target: complete PR #59 dual reciprocal review, merge #50 to
+  integration, close Issue #50, release the slice to `main`/`:8080`, then start
+  #57 only from the exact resulting integration SHA. Keep #51 blocked.
