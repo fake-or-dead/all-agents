@@ -20,9 +20,11 @@ export default function Register({ consent, csrfToken }: Props) {
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
     const codeInput = useRef<HTMLInputElement>(null);
+    const identityTypeInput = useRef<HTMLSelectElement>(null);
     const requestCodeButton = useRef<HTMLButtonElement>(null);
     const errorMessage = useRef<HTMLParagraphElement>(null);
     const requestGeneration = useRef(0);
+    const signupInFlight = useRef(false);
 
     function clearVerification() {
         setRegistrationToken("");
@@ -36,10 +38,16 @@ export default function Register({ consent, csrfToken }: Props) {
     }, [error]);
 
     useEffect(() => {
+        if (registrationToken) identityTypeInput.current?.focus();
+    }, [registrationToken]);
+
+    useEffect(() => {
         if (!proofExpiresAt) return;
 
         const expiresAt = Date.parse(proofExpiresAt);
         const expireProof = () => {
+            if (signupInFlight.current) return;
+
             requestGeneration.current += 1;
             clearVerification();
             setBusy(false);
@@ -110,7 +118,8 @@ export default function Register({ consent, csrfToken }: Props) {
     }
 
     async function register(form: HTMLFormElement) {
-        const generation = requestGeneration.current;
+        if (signupInFlight.current) return;
+
         setBusy(true);
         setError("");
         const data = formValues(form);
@@ -128,19 +137,26 @@ export default function Register({ consent, csrfToken }: Props) {
             setBusy(false);
             return;
         }
+        signupInFlight.current = true;
         const result = await submitJson("/signup", csrfToken, {
             ...data,
             registration_token: registrationToken,
             consent_accepted: data.consent_accepted === "yes",
             consent_version: consent.id,
         });
-        if (generation !== requestGeneration.current) return;
+        signupInFlight.current = false;
 
         if (result.ok) {
             window.location.assign(String(result.body.redirect ?? "/account"));
             return;
         }
 
+        if (Date.parse(proofExpiresAt) <= Date.now()) {
+            clearVerification();
+            setStatus(
+                "การยืนยันอีเมลหมดอายุ กรุณาขอรหัสและยืนยันใหม่ก่อนกรอกข้อมูลบัญชีต่อ",
+            );
+        }
         setError(
             String(
                 result.body.message ??
@@ -238,6 +254,7 @@ export default function Register({ consent, csrfToken }: Props) {
                         <select
                             id="identity_type"
                             name="identity_type"
+                            ref={identityTypeInput}
                             aria-describedby={
                                 error ? "registration-error" : undefined
                             }

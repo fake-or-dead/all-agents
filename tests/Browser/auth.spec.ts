@@ -90,15 +90,18 @@ async function expectNativeInvalidSubmit(
     ).toBe(false);
 }
 
-async function keyboardFill(
+async function expectNextTab(page: Page, target: ReturnType<Page["locator"]>) {
+    await page.keyboard.press("Tab");
+    await expect(target).toBeFocused();
+}
+
+async function typeIntoFocused(
+    page: Page,
     target: ReturnType<Page["locator"]>,
     value: string,
 ) {
-    await target.pressSequentially(value);
-}
-
-async function keyboardActivate(target: ReturnType<Page["locator"]>) {
-    await target.press("Enter");
+    await expect(target).toBeFocused();
+    await page.keyboard.insertText(value);
 }
 
 function recoveryPathFor(email: string): string {
@@ -271,6 +274,131 @@ test("FLOW-AUTH-01 verified proof expires while filling the form and can be re-v
     await expectFullDocumentAxe(page);
 });
 
+test("FLOW-AUTH-01 in-flight signup keeps its success response after proof expiry", async ({
+    page,
+}, testInfo) => {
+    const unique = `${Date.now()}${testInfo.workerIndex}inflight`;
+    const email = `inflight-${unique}@example.test`;
+    let signupDispatched!: () => void;
+    const dispatched = new Promise<void>((resolve) => {
+        signupDispatched = resolve;
+    });
+
+    await page.route("**/auth/verification/verify", async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+                registration_token: "p".repeat(64),
+                expires_at: new Date(Date.now() + 1_200).toISOString(),
+            }),
+        });
+    });
+    await page.route("**/auth/verification/request", async (route) => {
+        await route.fulfill({
+            status: 202,
+            contentType: "application/json",
+            body: JSON.stringify({
+                message: "หากข้อมูลถูกต้อง ระบบได้ส่งวิธียืนยันให้แล้ว",
+            }),
+        });
+    });
+    await page.goto("/signup");
+    await page.getByLabel("อีเมล").fill(email);
+    await page.getByRole("button", { name: "ขอรหัส" }).click();
+    await page.getByLabel("รหัสยืนยัน 6 หลัก").fill("246810");
+    await page.getByRole("button", { name: "ยืนยันรหัส" }).click();
+    await expect(page.locator("fieldset")).toBeEnabled();
+    await page.getByLabel("ประเภทเอกสารประจำตัว").selectOption("passport");
+    await page.getByLabel("เลขเอกสารประจำตัว").fill(`IF${unique}`);
+    await page.getByLabel("ชื่อ", { exact: true }).fill("ทดสอบ");
+    await page.getByLabel("นามสกุล").fill("ระหว่างส่ง");
+    await page.getByLabel(/^รหัสผ่านใหม่/).fill(password);
+    await page.getByLabel("ยืนยันรหัสผ่านใหม่").fill(password);
+    await page.getByRole("checkbox").check();
+    await page.route("**/signup", async (route) => {
+        if (route.request().method() !== "POST") {
+            await route.continue();
+            return;
+        }
+        signupDispatched();
+        await new Promise((resolve) => setTimeout(resolve, 1_500));
+        await route.fulfill({
+            status: 201,
+            contentType: "application/json",
+            body: JSON.stringify({ redirect: "/signup-complete" }),
+        });
+    });
+
+    await page.getByRole("button", { name: "สร้างบัญชี" }).click();
+    await dispatched;
+    await expect(
+        page.getByRole("button", { name: "กำลังสร้างบัญชี…" }),
+    ).toBeDisabled();
+    await expect(page).toHaveURL(/\/signup-complete$/);
+});
+
+test("FLOW-AUTH-01 in-flight signup handles rejection after proof expiry", async ({
+    page,
+}, testInfo) => {
+    const unique = `${Date.now()}${testInfo.workerIndex}rejected`;
+    const email = `rejected-${unique}@example.test`;
+
+    await page.route("**/auth/verification/verify", async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+                registration_token: "p".repeat(64),
+                expires_at: new Date(Date.now() + 1_200).toISOString(),
+            }),
+        });
+    });
+    await page.route("**/auth/verification/request", async (route) => {
+        await route.fulfill({
+            status: 202,
+            contentType: "application/json",
+            body: JSON.stringify({
+                message: "หากข้อมูลถูกต้อง ระบบได้ส่งวิธียืนยันให้แล้ว",
+            }),
+        });
+    });
+    await page.goto("/signup");
+    await page.getByLabel("อีเมล").fill(email);
+    await page.getByRole("button", { name: "ขอรหัส" }).click();
+    await page.getByLabel("รหัสยืนยัน 6 หลัก").fill("246810");
+    await page.getByRole("button", { name: "ยืนยันรหัส" }).click();
+    await expect(page.locator("fieldset")).toBeEnabled();
+    await page.getByLabel("ประเภทเอกสารประจำตัว").selectOption("passport");
+    await page.getByLabel("เลขเอกสารประจำตัว").fill(`RJ${unique}`);
+    await page.getByLabel("ชื่อ", { exact: true }).fill("ทดสอบ");
+    await page.getByLabel("นามสกุล").fill("ปฏิเสธ");
+    await page.getByLabel(/^รหัสผ่านใหม่/).fill(password);
+    await page.getByLabel("ยืนยันรหัสผ่านใหม่").fill(password);
+    await page.getByRole("checkbox").check();
+    await page.route("**/signup", async (route) => {
+        if (route.request().method() !== "POST") {
+            await route.continue();
+            return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1_500));
+        await route.fulfill({
+            status: 422,
+            contentType: "application/json",
+            body: JSON.stringify({ message: "ข้อมูลสมัครไม่ผ่านการตรวจสอบ" }),
+        });
+    });
+
+    await page.getByRole("button", { name: "สร้างบัญชี" }).click();
+    await expect(page.getByRole("alert")).toHaveText(
+        "ข้อมูลสมัครไม่ผ่านการตรวจสอบ",
+    );
+    await expect(page.getByRole("alert")).toBeFocused();
+    await expect(page.getByRole("status")).toContainText("หมดอายุ");
+    await expect(page.locator("fieldset")).toHaveAttribute("disabled", "");
+    await expect(page.getByRole("button", { name: "ขอรหัส" })).toBeEnabled();
+});
+
 test("FLOW-AUTH-02 sign-in handles failures, keyboard, zoom, and restores access", async ({
     page,
 }, testInfo) => {
@@ -433,100 +561,212 @@ test("FLOW-AUTH-04 keyboard-only registration, sign-in, recovery, and password c
 }, testInfo) => {
     const unique = `${Date.now()}${testInfo.workerIndex}keyboard`;
     const email = `keyboard-${unique}@example.test`;
-    const identity = `K${Date.now()}${testInfo.workerIndex}`;
+    const identity = `${Date.now()}`.slice(-13);
+    const changedPassword = "changed-password-456";
+    const skipLink = page.getByRole("link", {
+        name: "ข้ามไปยังเนื้อหาหลัก",
+    });
+    const wordmark = page.getByRole("link", { name: "Tapoda Next" });
+    const headerSignIn = page
+        .getByRole("navigation", { name: "บัญชี" })
+        .getByRole("link", { name: "เข้าสู่ระบบ" });
 
     await page.goto("/signup");
-    await keyboardFill(page.getByLabel("อีเมล"), email);
-    await keyboardActivate(page.getByRole("button", { name: "ขอรหัส" }));
+    await expectNextTab(page, skipLink);
+    await expectNextTab(page, wordmark);
+    await expectNextTab(page, headerSignIn);
+    await expectNextTab(page, page.getByLabel("อีเมล"));
+    await typeIntoFocused(page, page.getByLabel("อีเมล"), email);
+    await expectNextTab(page, page.getByLabel("รหัสยืนยัน 6 หลัก"));
+    await expectNextTab(page, page.getByRole("button", { name: "ขอรหัส" }));
+    await page.keyboard.press("Enter");
     await expect(page.getByLabel("รหัสยืนยัน 6 หลัก")).toBeFocused();
     await page.keyboard.insertText("246810");
-    await keyboardActivate(page.getByRole("button", { name: "ยืนยันรหัส" }));
+    await expectNextTab(page, page.getByRole("button", { name: "ขอรหัส" }));
+    await expectNextTab(page, page.getByRole("button", { name: "ยืนยันรหัส" }));
+    await page.keyboard.press("Enter");
     await expect(page.locator("fieldset")).toBeEnabled();
-    await page.getByLabel("ประเภทเอกสารประจำตัว").selectOption("passport");
-    await keyboardFill(page.getByLabel("เลขเอกสารประจำตัว"), identity);
-    await keyboardFill(page.getByLabel("ชื่อ", { exact: true }), "ทดสอบ");
-    await keyboardFill(page.getByLabel("นามสกุล"), "คีย์บอร์ด");
-    await keyboardFill(page.getByLabel(/^รหัสผ่านใหม่/), password);
-    await keyboardFill(page.getByLabel("ยืนยันรหัสผ่านใหม่"), password);
-    await page.getByRole("checkbox").press("Space");
-    await keyboardActivate(page.getByRole("button", { name: "สร้างบัญชี" }));
+    await expect(page.getByLabel("ประเภทเอกสารประจำตัว")).toBeFocused();
+    await expect(page.getByLabel("ประเภทเอกสารประจำตัว")).toHaveValue(
+        "personal_id",
+    );
+    await expectNextTab(page, page.getByLabel("เลขเอกสารประจำตัว"));
+    await typeIntoFocused(page, page.getByLabel("เลขเอกสารประจำตัว"), identity);
+    await expectNextTab(page, page.getByLabel("รหัสเชื่อมบุคคลเดิม (ถ้ามี)"));
+    await expectNextTab(page, page.getByLabel("ชื่อ", { exact: true }));
+    await typeIntoFocused(
+        page,
+        page.getByLabel("ชื่อ", { exact: true }),
+        "ทดสอบ",
+    );
+    await expectNextTab(page, page.getByLabel("นามสกุล"));
+    await typeIntoFocused(page, page.getByLabel("นามสกุล"), "คีย์บอร์ด");
+    await expectNextTab(page, page.getByLabel(/^รหัสผ่านใหม่/));
+    await typeIntoFocused(page, page.getByLabel(/^รหัสผ่านใหม่/), password);
+    await expectNextTab(page, page.getByLabel("ยืนยันรหัสผ่านใหม่"));
+    await typeIntoFocused(
+        page,
+        page.getByLabel("ยืนยันรหัสผ่านใหม่"),
+        password,
+    );
+    await expectNextTab(page, page.getByRole("checkbox"));
+    await page.keyboard.press("Space");
+    await expect(page.getByRole("checkbox")).toBeChecked();
+    await expectNextTab(
+        page,
+        page.getByRole("link", {
+            name: "ความยินยอมการสร้างบัญชี (ตัวอย่างภายใน)",
+        }),
+    );
+    await expectNextTab(page, page.getByRole("button", { name: "สร้างบัญชี" }));
+    await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/account$/);
     await expectAuthReflow(page);
     await expectFullDocumentAxe(page);
 
-    await page.getByRole("button", { name: "ออกจากระบบ" }).click();
-    await expect(page).toHaveURL(/\/signin$/);
-    await page.getByLabel("ประเภทเอกสารประจำตัว").selectOption("passport");
-    await keyboardFill(page.getByLabel("เลขเอกสารประจำตัว"), identity);
-    await keyboardFill(page.getByLabel("รหัสผ่าน"), password);
-    await keyboardActivate(page.getByRole("button", { name: "เข้าสู่ระบบ" }));
-    await expect(page).toHaveURL(/\/account$/);
-
-    await keyboardFill(page.getByLabel("รหัสผ่านปัจจุบัน"), password);
-    await keyboardFill(
+    await expectNextTab(page, skipLink);
+    await expectNextTab(page, wordmark);
+    await expectNextTab(page, headerSignIn);
+    await expectNextTab(page, page.getByLabel("รหัสผ่านปัจจุบัน"));
+    await typeIntoFocused(page, page.getByLabel("รหัสผ่านปัจจุบัน"), password);
+    await expectNextTab(page, page.getByLabel("รหัสผ่านใหม่", { exact: true }));
+    await typeIntoFocused(
+        page,
         page.getByLabel("รหัสผ่านใหม่", { exact: true }),
-        "changed-password-456",
+        changedPassword,
     );
-    await keyboardFill(
+    await expectNextTab(page, page.getByLabel("ยืนยันรหัสผ่านใหม่"));
+    await typeIntoFocused(
+        page,
         page.getByLabel("ยืนยันรหัสผ่านใหม่"),
-        "changed-password-456",
+        changedPassword,
     );
-    await keyboardActivate(
+    await expectNextTab(
+        page,
         page.getByRole("button", { name: "เปลี่ยนรหัสผ่าน" }),
     );
+    await page.keyboard.press("Enter");
     await expect(page.getByRole("status")).toContainText("เปลี่ยนรหัสผ่าน");
     await expectAuthReflow(page);
     await expectFullDocumentAxe(page);
+    await expectNextTab(page, page.getByRole("button", { name: "ออกจากระบบ" }));
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/signin$/);
 
+    await expectNextTab(page, skipLink);
+    await expectNextTab(page, wordmark);
+    await expectNextTab(page, headerSignIn);
+    await expectNextTab(page, page.getByLabel("ประเภทเอกสารประจำตัว"));
+    await expect(page.getByLabel("ประเภทเอกสารประจำตัว")).toHaveValue(
+        "personal_id",
+    );
+    await expectNextTab(page, page.getByLabel("เลขเอกสารประจำตัว"));
+    await typeIntoFocused(page, page.getByLabel("เลขเอกสารประจำตัว"), identity);
+    await expectNextTab(page, page.getByLabel("รหัสผ่าน"));
+    await typeIntoFocused(page, page.getByLabel("รหัสผ่าน"), changedPassword);
+    await expectNextTab(
+        page,
+        page.getByRole("button", { name: "เข้าสู่ระบบ" }),
+    );
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/account$/);
+
+    await expectNextTab(page, skipLink);
+    await expectNextTab(page, wordmark);
+    await expectNextTab(page, headerSignIn);
+    await expectNextTab(page, page.getByLabel("รหัสผ่านปัจจุบัน"));
+    await expectNextTab(page, page.getByLabel("รหัสผ่านใหม่", { exact: true }));
+    await expectNextTab(page, page.getByLabel("ยืนยันรหัสผ่านใหม่"));
+    await expectNextTab(
+        page,
+        page.getByRole("button", { name: "เปลี่ยนรหัสผ่าน" }),
+    );
+    await expectNextTab(page, page.getByRole("button", { name: "ออกจากระบบ" }));
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/signin$/);
+
+    await expectNextTab(page, skipLink);
+    await expectNextTab(page, wordmark);
+    await expectNextTab(page, headerSignIn);
+    await expectNextTab(page, page.getByLabel("ประเภทเอกสารประจำตัว"));
+    await expectNextTab(page, page.getByLabel("เลขเอกสารประจำตัว"));
+    await expectNextTab(page, page.getByLabel("รหัสผ่าน"));
+    await expectNextTab(
+        page,
+        page.getByRole("button", { name: "เข้าสู่ระบบ" }),
+    );
+    await expectNextTab(page, page.getByRole("link", { name: "ลืมรหัสผ่าน" }));
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/forgot$/);
+
+    await expectNextTab(page, skipLink);
+    await expectNextTab(page, wordmark);
+    await expectNextTab(page, headerSignIn);
+    await expectNextTab(page, page.getByLabel("อีเมล"));
+    await typeIntoFocused(page, page.getByLabel("อีเมล"), email);
+    await expectNextTab(
+        page,
+        page.getByRole("button", { name: "ขอลิงก์กู้คืน" }),
+    );
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("status")).toContainText("หากมีบัญชีที่ตรงกัน");
+    const recoveryPath = recoveryPathFor(email);
+    await page.goto(recoveryPath);
+    await expectNextTab(page, skipLink);
+    await expectNextTab(page, wordmark);
+    await expectNextTab(page, headerSignIn);
+    await expectNextTab(page, page.getByLabel("รหัสผ่านใหม่", { exact: true }));
+    await typeIntoFocused(
+        page,
+        page.getByLabel("รหัสผ่านใหม่", { exact: true }),
+        "recovered-keyboard-789",
+    );
+    await expectNextTab(page, page.getByLabel("ยืนยันรหัสผ่านใหม่"));
+    await typeIntoFocused(
+        page,
+        page.getByLabel("ยืนยันรหัสผ่านใหม่"),
+        "recovered-keyboard-789",
+    );
+    await expectNextTab(
+        page,
+        page.getByRole("button", { name: "ตั้งรหัสผ่านใหม่" }),
+    );
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/signin$/);
+    await expectAuthReflow(page);
+    await expectFullDocumentAxe(page);
+});
+
+test("FLOW-AUTH-05 denied account session stays accessible and responsive", async ({
+    page,
+}, testInfo) => {
+    await registerAccount(page, `${Date.now()}${testInfo.workerIndex}denied`);
     await page.route("**/account/password", async (route) => {
-        if (route.request().method() === "POST") {
-            await route.fulfill({
-                status: 401,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    message: "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่",
-                }),
-            });
+        if (route.request().method() !== "POST") {
+            await route.continue();
             return;
         }
-        await route.continue();
+        await route.fulfill({
+            status: 401,
+            contentType: "application/json",
+            body: JSON.stringify({
+                message: "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่",
+            }),
+        });
     });
-    await page.getByLabel("รหัสผ่านปัจจุบัน").fill("changed-password-456");
+    await page.getByLabel("รหัสผ่านปัจจุบัน").fill(password);
     await page
         .getByLabel("รหัสผ่านใหม่", { exact: true })
         .fill("denied-password-789");
     await page.getByLabel("ยืนยันรหัสผ่านใหม่").fill("denied-password-789");
     await page.getByRole("button", { name: "เปลี่ยนรหัสผ่าน" }).click();
+
     await expect(page.getByRole("alert")).toContainText("เซสชันหมดอายุ");
     await expect(page.getByRole("alert")).toBeFocused();
     await expect(page.getByLabel("รหัสผ่านปัจจุบัน")).toHaveAttribute(
         "aria-describedby",
         "account-error",
     );
-    await expectAuthReflow(page);
-    await expectFullDocumentAxe(page);
-    await page.unroute("**/account/password");
-
-    await page.getByRole("button", { name: "ออกจากระบบ" }).click();
-    await expect(page).toHaveURL(/\/signin$/);
-    await page.goto("/forgot");
-    await keyboardFill(page.getByLabel("อีเมล"), email);
-    await keyboardActivate(page.getByRole("button", { name: "ขอลิงก์กู้คืน" }));
-    await expect(page.getByRole("status")).toContainText("หากมีบัญชีที่ตรงกัน");
-    const recoveryPath = recoveryPathFor(email);
-    await page.goto(recoveryPath);
-    await keyboardFill(
-        page.getByLabel("รหัสผ่านใหม่", { exact: true }),
-        "recovered-keyboard-789",
-    );
-    await keyboardFill(
-        page.getByLabel("ยืนยันรหัสผ่านใหม่"),
-        "recovered-keyboard-789",
-    );
-    await keyboardActivate(
-        page.getByRole("button", { name: "ตั้งรหัสผ่านใหม่" }),
-    );
-    await expect(page).toHaveURL(/\/signin$/);
     await expectAuthReflow(page);
     await expectFullDocumentAxe(page);
 });
