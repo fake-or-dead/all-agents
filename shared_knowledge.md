@@ -132,6 +132,15 @@ previous status under a new timestamp.
 - Bind Playwright to an explicit candidate URL and recovery container.
 - Do not reuse partially exercised Redis rate-limit state as a clean full-suite
   environment.
+- Build or mount the exact current candidate into the browser runner. Before a
+  final run, compare hashes for changed browser specs, CSS, and snapshots
+  inside the runner against the worktree; an older container context invalidates
+  the result.
+- Pin the reviewed browser architecture. Native arm64 glyph raster output is
+  not evidence for a Linux amd64 CI baseline.
+- Time-boundary tests must control time and response release explicitly. Hold
+  an in-flight request, fast-forward the browser clock past expiry, then release
+  it; short wall-clock sleeps make correctness depend on runner speed.
 - Keyboard-only acceptance uses real Tab/Shift+Tab/Space/Enter navigation and
   asserts every focus transition; direct locator focus/click is not evidence.
 - Full-document Axe checks include shared header/navigation states.
