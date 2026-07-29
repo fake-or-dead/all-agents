@@ -27,15 +27,19 @@ final readonly class IdentitySecurityConfiguration
             );
         }
 
-        $this->assertCurrentAndPreviousVersionsDiffer(
+        $this->assertPreviousLookupConfiguration(
             'people lookup',
             'people.identifier_lookup_key_version',
             'people.identifier_lookup_previous_version',
+            'people.identifier_lookup_previous_key',
+            'people.identifier_lookup_keys',
         );
-        $this->assertCurrentAndPreviousVersionsDiffer(
+        $this->assertPreviousLookupConfiguration(
             'account lookup',
             'identity-access.account_lookup_key_version',
             'identity-access.account_lookup_previous_version',
+            'identity-access.account_lookup_previous_key',
+            'identity-access.account_lookup_keys',
         );
 
         $keySets = [
@@ -102,16 +106,40 @@ final readonly class IdentitySecurityConfiguration
         return $keys;
     }
 
-    private function assertCurrentAndPreviousVersionsDiffer(
+    private function assertPreviousLookupConfiguration(
         string $name,
         string $currentVersionPath,
         string $previousVersionPath,
+        string $previousKeyPath,
+        string $keysPath,
     ): void {
         $current = $this->config->get($currentVersionPath);
         $previous = $this->config->get($previousVersionPath);
+        $previousKey = $this->config->get($previousKeyPath);
+        $keys = $this->config->get($keysPath);
+        $hasPreviousVersion = is_string($previous) && $previous !== '';
+        $hasPreviousKey = is_string($previousKey) && $previousKey !== '';
+
+        if ($hasPreviousVersion !== $hasPreviousKey) {
+            throw new RuntimeException(
+                "{$name} previous version and key must be configured together.",
+            );
+        }
+
+        if (! $hasPreviousVersion) {
+            return;
+        }
 
         if (is_string($current) && $current !== '' && $previous === $current) {
             throw new RuntimeException("{$name} current and previous key versions must differ.");
+        }
+
+        $mappedKey = is_array($keys) ? ($keys[$previous] ?? null) : null;
+
+        if (! is_string($mappedKey) || ! hash_equals($previousKey, $mappedKey)) {
+            throw new RuntimeException(
+                "{$name} previous key must be mapped under version {$previous}.",
+            );
         }
     }
 

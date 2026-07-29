@@ -92,6 +92,68 @@ final class IdentitySecurityConfigurationTest extends TestCase
         $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
     }
 
+    public function test_people_lookup_rejects_a_previous_version_without_its_key(): void
+    {
+        config()->set('people.identifier_lookup_previous_version', 'v0');
+        config()->set('people.identifier_lookup_previous_key', null);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('people lookup previous version and key must be configured together');
+        $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
+    }
+
+    public function test_account_lookup_rejects_a_previous_key_without_its_version(): void
+    {
+        config()->set('identity-access.account_lookup_previous_version', '');
+        config()->set('identity-access.account_lookup_previous_key', str_repeat('a', 32));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('account lookup previous version and key must be configured together');
+        $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
+    }
+
+    public function test_previous_key_must_be_mapped_under_its_declared_version(): void
+    {
+        config()->set('people.identifier_lookup_previous_version', 'v0');
+        config()->set('people.identifier_lookup_previous_key', str_repeat('p', 32));
+        config()->set('people.identifier_lookup_keys.v0', str_repeat('q', 32));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('people lookup previous key must be mapped under version v0');
+        $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
+    }
+
+    public function test_canonical_local_environment_exposes_both_previous_rotation_pairs(): void
+    {
+        $example = (string) file_get_contents(base_path('.env.example'));
+        $compose = (string) file_get_contents(base_path('compose.yaml'));
+        $bootstrap = (string) file_get_contents(base_path('bin/bootstrap-env'));
+        $names = [
+            'PEOPLE_IDENTIFIER_LOOKUP_PREVIOUS_VERSION',
+            'PEOPLE_IDENTIFIER_LOOKUP_PREVIOUS_KEY',
+            'IDENTITY_ACCOUNT_LOOKUP_PREVIOUS_VERSION',
+            'IDENTITY_ACCOUNT_LOOKUP_PREVIOUS_KEY',
+        ];
+
+        foreach ($names as $name) {
+            self::assertMatchesRegularExpression(
+                "/^{$name}=$/m",
+                $example,
+                "{$name} must be declared empty in .env.example.",
+            );
+            self::assertStringContainsString(
+                "{$name}: \${{$name}:-}",
+                $compose,
+                "{$name} must be propagated to every canonical Compose app service.",
+            );
+            self::assertStringContainsString(
+                "ensure_present {$name}",
+                $bootstrap,
+                "{$name} must be appended without generating or replacing rotation secrets.",
+            );
+        }
+    }
+
     public function test_boot_validation_rejects_an_unreviewed_bcrypt_round_before_serving_requests(): void
     {
         config()->set('hashing.bcrypt.rounds', 11);

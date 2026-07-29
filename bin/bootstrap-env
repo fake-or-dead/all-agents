@@ -26,13 +26,25 @@ set_if_empty() {
     fi
 }
 
+ensure_present() {
+    name="$1"
+
+    if ! grep -q "^${name}=" .env; then
+        printf '%s=\n' "${name}" >> .env
+    fi
+}
+
 set_if_empty APP_KEY "${app_key}"
 set_if_empty DB_PASSWORD "${db_password}"
 set_if_empty POSTGRES_PASSWORD "${db_password}"
 set_if_empty PEOPLE_IDENTIFIER_LOOKUP_KEY_VERSION "v1"
 set_if_empty PEOPLE_IDENTIFIER_LOOKUP_KEY "${people_lookup_key}"
+ensure_present PEOPLE_IDENTIFIER_LOOKUP_PREVIOUS_VERSION
+ensure_present PEOPLE_IDENTIFIER_LOOKUP_PREVIOUS_KEY
 set_if_empty IDENTITY_ACCOUNT_LOOKUP_KEY_VERSION "v1"
 set_if_empty IDENTITY_ACCOUNT_LOOKUP_KEY "${account_lookup_key}"
+ensure_present IDENTITY_ACCOUNT_LOOKUP_PREVIOUS_VERSION
+ensure_present IDENTITY_ACCOUNT_LOOKUP_PREVIOUS_KEY
 set_if_empty IDENTITY_RATE_LIMIT_KEY_VERSION "v1"
 set_if_empty IDENTITY_RATE_LIMIT_KEY "${rate_limit_key}"
 set_if_empty IDENTITY_VERIFICATION_ADAPTER "deterministic-fake"

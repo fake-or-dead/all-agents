@@ -3,6 +3,7 @@
 namespace Tests\Feature\IdentityAccess;
 
 use App\Modules\IdentityAccess\Application\IdentityAccessWorkflow;
+use App\Modules\IdentityAccess\Infrastructure\IdentitySecurityConfiguration;
 use App\Modules\IdentityAccess\Infrastructure\Verification\DeterministicFakeVerificationGateway;
 use App\Modules\People\Contracts\PersonIdentityDirectory;
 use App\Modules\People\Data\IdentityClaim;
@@ -167,6 +168,110 @@ final class RegistrationJourneyTest extends TestCase
             'id' => 'delayed-registration-session',
         ]);
         $this->assertGuest();
+    }
+
+    #[Group('service-integration')]
+    public function test_previous_account_and_people_keys_preserve_v0_ownership_after_v1_rotation_on_postgres(): void
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            if (getenv('REQUIRE_REAL_SERVICES') === '1') {
+                self::fail('REQUIRE_REAL_SERVICES=1 requires PostgreSQL for the lookup-key rotation proof.');
+            }
+
+            self::markTestSkipped('The lookup-key rotation proof is PostgreSQL-specific.');
+        }
+
+        $peopleV0 = str_repeat('p', 64);
+        $peopleV1 = str_repeat('q', 64);
+        $accountV0 = str_repeat('a', 64);
+        $accountV1 = str_repeat('b', 64);
+        config()->set([
+            'people.identifier_lookup_key_version' => 'v0',
+            'people.identifier_lookup_previous_version' => '',
+            'people.identifier_lookup_previous_key' => null,
+            'people.identifier_lookup_keys' => ['v0' => $peopleV0],
+            'identity-access.account_lookup_key_version' => 'v0',
+            'identity-access.account_lookup_previous_version' => '',
+            'identity-access.account_lookup_previous_key' => null,
+            'identity-access.account_lookup_keys' => ['v0' => $accountV0],
+        ]);
+        $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
+
+        $email = 'rotation-owner@example.test';
+        $identityNumber = 'ROTATE123';
+        $token = $this->verifiedRegistrationToken($email);
+        $payload = [
+            'email' => $email,
+            'registration_token' => $token,
+            'identity_type' => 'passport',
+            'identity_number' => $identityNumber,
+            'given_name' => 'Rotation',
+            'family_name' => 'Owner',
+            'password' => 'safe-password-123',
+            'password_confirmation' => 'safe-password-123',
+            'consent_accepted' => true,
+            'consent_version' => self::CONSENT_VERSION_ID,
+        ];
+        $this->postJson('/signup', $payload)->assertCreated();
+        $accountId = (string) DB::table('accounts')->value('id');
+        $personId = (string) DB::table('people')->value('id');
+        $this->assertDatabaseHas('accounts', [
+            'id' => $accountId,
+            'email_digest_key_version' => 'v0',
+        ]);
+        $this->assertDatabaseHas('person_identifiers', [
+            'person_id' => $personId,
+            'lookup_key_version' => 'v0',
+        ]);
+
+        config()->set([
+            'people.identifier_lookup_key_version' => 'v1',
+            'people.identifier_lookup_previous_version' => 'v0',
+            'people.identifier_lookup_previous_key' => $peopleV0,
+            'people.identifier_lookup_keys' => [
+                'v1' => $peopleV1,
+                'v0' => $peopleV0,
+            ],
+            'identity-access.account_lookup_key_version' => 'v1',
+            'identity-access.account_lookup_previous_version' => 'v0',
+            'identity-access.account_lookup_previous_key' => $accountV0,
+            'identity-access.account_lookup_keys' => [
+                'v1' => $accountV1,
+                'v0' => $accountV0,
+            ],
+        ]);
+        $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
+
+        $identity = IdentityClaim::fromInput('passport', $identityNumber);
+        $this->assertSame(
+            $personId,
+            $this->app->make(PersonIdentityDirectory::class)->personIdForIdentity($identity),
+        );
+        $this->postJson('/forgot', ['email' => $email])->assertAccepted();
+        $this->assertDatabaseHas('audit_events', [
+            'action' => 'account.recovery.requested',
+            'resource_id' => $accountId,
+            'outcome' => 'accepted',
+        ]);
+
+        $duplicateEmailToken = $this->verifiedRegistrationToken($email);
+        $this->postJson('/signup', [
+            ...$payload,
+            'registration_token' => $duplicateEmailToken,
+            'identity_number' => 'ROTATE456',
+        ])->assertUnprocessable();
+        $this->assertDatabaseCount('accounts', 1);
+        $this->assertDatabaseCount('people', 1);
+
+        $duplicateIdentityToken = $this->verifiedRegistrationToken('second-rotation@example.test');
+        $this->postJson('/signup', [
+            ...$payload,
+            'email' => 'second-rotation@example.test',
+            'registration_token' => $duplicateIdentityToken,
+        ])->assertUnprocessable();
+        $this->assertDatabaseCount('accounts', 1);
+        $this->assertDatabaseCount('people', 1);
+        $this->assertDatabaseCount('person_identifiers', 1);
     }
 
     public function test_registration_rejects_stale_consent_without_partial_account_creation(): void
