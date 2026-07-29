@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\Account;
 use Database\Seeders\CourseCatalogSeeder;
-use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -61,6 +61,11 @@ final class PublicCourseCatalogTest extends TestCase
             ->assertSee('เหลือ 2 จาก 30 ที่นั่ง')
             ->assertSee('คู่มือเตรียมตัวเข้าร่วมหลักสูตร')
             ->assertSee('https://maps.example.invalid/tapoda', false)
+            ->assertSee('10 สิงหาคม 2569')
+            ->assertSee('20 สิงหาคม 2569')
+            ->assertSee('1 กรกฎาคม 2569 เวลา 00:00 น. (Asia/Bangkok)')
+            ->assertSee('5 สิงหาคม 2569 เวลา 23:59 น. (Asia/Bangkok)')
+            ->assertSee('datetime="2026-07-01 00:00:00+07"', false)
             ->assertSee('กรอกข้อมูลให้ครบเพื่อประเมินสิทธิ์เบื้องต้น');
     }
 
@@ -106,30 +111,69 @@ final class PublicCourseCatalogTest extends TestCase
 
         $this->post('/course/detail/D10-2026-06-TAPODA/eligibility', $this->eligibleInput())
             ->assertOk()
-            ->assertSee('registration-closed')
-            ->assertSee('ปิดรับสมัครแล้ว');
+            ->assertSee('session-ended')
+            ->assertSee('รอบหลักสูตรนี้สิ้นสุดแล้ว');
     }
 
     public function test_existing_application_state_uses_authenticated_person_ownership(): void
     {
         $this->travelTo('2026-07-29 12:00:00');
 
+        $ownerAccountId = '11111111-1111-4111-8111-111111111111';
+        $otherAccountId = '22222222-2222-4222-8222-222222222222';
+        $inactiveAccountId = '33333333-3333-4333-8333-333333333333';
+        $adminAccountId = '44444444-4444-4444-8444-444444444444';
         $ownerPersonId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $otherPersonId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
         DB::table('application_workflow_facts')->insert([
             'course_session_id' => '10000000-0000-4000-8000-000000000001',
             'person_id' => $ownerPersonId,
             'state' => 'submitted',
         ]);
+        DB::table('applicant_account_ownerships')->insert([
+            [
+                'account_id' => $ownerAccountId,
+                'person_id' => $ownerPersonId,
+                'account_status' => 'active',
+                'identity_role' => 'applicant',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'account_id' => $otherAccountId,
+                'person_id' => $otherPersonId,
+                'account_status' => 'active',
+                'identity_role' => 'applicant',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'account_id' => $inactiveAccountId,
+                'person_id' => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+                'account_status' => 'inactive',
+                'identity_role' => 'applicant',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'account_id' => $adminAccountId,
+                'person_id' => 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+                'account_status' => 'active',
+                'identity_role' => 'administrator',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
 
         $this
-            ->actingAs(new CourseApplicantAccount('ordinary-applicant', $ownerPersonId))
+            ->actingAs(new Account(['id' => $ownerAccountId]))
             ->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
             ->assertOk()
             ->assertSee('existing-application')
             ->assertSee('มีใบสมัครสำหรับรอบนี้อยู่แล้ว');
 
         $this
-            ->actingAs(new CourseApplicantAccount('other-applicant', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'))
+            ->actingAs(new Account(['id' => $otherAccountId]))
             ->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
             ->assertOk()
             ->assertSee('eligible');
@@ -140,7 +184,13 @@ final class PublicCourseCatalogTest extends TestCase
             ->assertSee('preliminary-eligible');
 
         $this
-            ->actingAs(new CourseApplicantAccount('administrator', $ownerPersonId, 'administrator'))
+            ->actingAs(new Account(['id' => $inactiveAccountId]))
+            ->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+            ->assertOk()
+            ->assertSee('preliminary-eligible');
+
+        $this
+            ->actingAs(new Account(['id' => $adminAccountId]))
             ->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
             ->assertOk()
             ->assertSee('preliminary-eligible');
@@ -276,6 +326,50 @@ final class PublicCourseCatalogTest extends TestCase
             ->assertSee('invalid-source-state');
     }
 
+    public function test_raw_category_shape_and_cross_session_windows_fail_closed(): void
+    {
+        $this->travelTo('2026-07-29 12:00:00');
+
+        foreach ([
+            json_encode(['unexpected' => 'female'], JSON_THROW_ON_ERROR),
+            json_encode(['female', ['unexpected' => true]], JSON_THROW_ON_ERROR),
+        ] as $malformedCategories) {
+            DB::table('course_sessions')->where('code', 'D10-2026-08-TAPODA')->update([
+                'approved_categories' => $malformedCategories,
+            ]);
+
+            $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+                ->assertOk()
+                ->assertSee('invalid-source-state')
+                ->assertDontSee('preliminary-eligible');
+        }
+
+        DB::table('course_sessions')->where('code', 'D10-2026-08-TAPODA')->update([
+            'approved_categories' => json_encode(['female', 'male', 'monastic'], JSON_THROW_ON_ERROR),
+            'registration_opens_at' => '2026-08-21 00:00:00+07',
+            'registration_closes_at' => '2026-08-22 00:00:00+07',
+        ]);
+
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+            ->assertOk()
+            ->assertSee('invalid-source-state')
+            ->assertDontSee('preliminary-eligible');
+    }
+
+    public function test_ended_session_never_returns_eligible(): void
+    {
+        $this->travelTo('2026-06-11 00:00:00 Asia/Bangkok');
+
+        $this->post('/course/detail/D10-2026-06-TAPODA/eligibility', [
+            'age' => '45',
+            'category' => 'female',
+            'applicant_type' => 'trainee',
+        ])
+            ->assertOk()
+            ->assertSee('session-ended')
+            ->assertDontSee('preliminary-eligible');
+    }
+
     public function test_public_content_and_document_compatibility_urls_have_safe_outcomes(): void
     {
         foreach (['/suggest', '/applicant-qualifications', '/about'] as $path) {
@@ -301,13 +395,4 @@ final class PublicCourseCatalogTest extends TestCase
     {
         return ['age' => '30', 'category' => 'female', 'applicant_type' => 'trainee'];
     }
-}
-
-final class CourseApplicantAccount extends Authenticatable
-{
-    public function __construct(
-        public string $id,
-        public ?string $person_id,
-        public string $identity_type = 'applicant',
-    ) {}
 }

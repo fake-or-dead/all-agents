@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\CourseCatalog\Contracts\CourseCatalog;
 use App\Modules\CourseCatalog\Data\EligibilityContext;
 use App\Modules\IdentityAccess\Contracts\ApplicantIdentityResolver;
+use App\Support\ThaiDateFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
@@ -16,8 +17,9 @@ final class CourseDetailController extends Controller
     public function show(
         string $courseCode,
         CourseCatalog $catalog,
+        ThaiDateFormatter $dates,
     ): View {
-        return $this->view($courseCode, $catalog, new EligibilityContext(null, null, null, null), [], [
+        return $this->view($courseCode, $catalog, $dates, new EligibilityContext(null, null, null, null), [], [
             'age' => '',
             'category' => '',
             'applicant_type' => '',
@@ -29,6 +31,7 @@ final class CourseDetailController extends Controller
         string $courseCode,
         CourseCatalog $catalog,
         ApplicantIdentityResolver $identities,
+        ThaiDateFormatter $dates,
     ): Response {
         $identity = $identities->resolve($request);
         $inputErrors = [];
@@ -49,7 +52,7 @@ final class CourseDetailController extends Controller
             $identity?->personId,
         );
 
-        $view = $this->view($courseCode, $catalog, $context, $inputErrors, [
+        $view = $this->view($courseCode, $catalog, $dates, $context, $inputErrors, [
             'age' => $request->input('age', ''),
             'category' => $request->input('category', ''),
             'applicant_type' => $request->input('applicant_type', ''),
@@ -68,6 +71,7 @@ final class CourseDetailController extends Controller
     private function view(
         string $courseCode,
         CourseCatalog $catalog,
+        ThaiDateFormatter $dates,
         EligibilityContext $context,
         array $inputErrors,
         array $eligibilityInput,
@@ -79,6 +83,24 @@ final class CourseDetailController extends Controller
 
         return view('public.course-detail', [
             'course' => $view,
+            'displayDates' => [
+                'starts_on' => $dates->date(
+                    (string) $view->session['starts_on'],
+                    (string) $view->session['timezone'],
+                ),
+                'ends_on' => $dates->date(
+                    (string) $view->session['ends_on'],
+                    (string) $view->session['timezone'],
+                ),
+                'registration_opens_at' => $dates->dateTime(
+                    (string) $view->session['registration_opens_at'],
+                    (string) $view->session['timezone'],
+                ),
+                'registration_closes_at' => $dates->dateTime(
+                    (string) $view->session['registration_closes_at'],
+                    (string) $view->session['timezone'],
+                ),
+            ],
             'eligibilityInput' => $eligibilityInput,
             'inputErrors' => $inputErrors,
         ]);

@@ -109,11 +109,20 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
         ], $this->documents->forSession((string) $row->id));
 
         $approvedCategories = json_decode((string) $row->approved_categories, true);
-        $categories = is_array($approvedCategories)
-            ? array_values(array_filter($approvedCategories, 'is_string'))
-            : [];
+        $categorySourceValid = json_last_error() === JSON_ERROR_NONE
+            && is_array($approvedCategories)
+            && array_is_list($approvedCategories)
+            && collect($approvedCategories)->every(
+                static fn (mixed $category): bool => is_string($category),
+            );
+        $categories = $categorySourceValid ? $approvedCategories : [];
         $mapUrl = HttpsUrl::fromUntrusted((string) $row->map_url);
-        $sourceErrors = $this->sourceErrors($row, $categories, $capacityRules);
+        $sourceErrors = $this->sourceErrors(
+            $row,
+            $categories,
+            $categorySourceValid,
+            $capacityRules,
+        );
 
         $session = [
             'id' => (string) $row->id,
@@ -188,12 +197,21 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
     private function registrationStatus(object|array $session): string
     {
         try {
+            $timezone = new DateTimeZone((string) data_get($session, 'timezone'));
             $opensAt = CarbonImmutable::parse(data_get($session, 'registration_opens_at'));
             $closesAt = CarbonImmutable::parse(data_get($session, 'registration_closes_at'));
+            $endsAt = CarbonImmutable::parse(
+                (string) data_get($session, 'ends_on'),
+                $timezone,
+            )->endOfDay();
         } catch (\Throwable) {
             return 'invalid';
         }
-        $now = CarbonImmutable::now();
+        $now = CarbonImmutable::now()->setTimezone($timezone);
+
+        if ($now->isAfter($endsAt)) {
+            return 'closed';
+        }
 
         if ($now->isBefore($opensAt)) {
             return 'upcoming';
@@ -221,6 +239,14 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
                 'invalid-source-state',
                 'ข้อมูลนโยบายรอบหลักสูตรไม่สมบูรณ์ ระบบระงับการประเมินไว้',
                 $session['source_errors'],
+            );
+        }
+
+        if ($this->sessionHasEnded($session)) {
+            return new EligibilityResult(
+                'unavailable',
+                'session-ended',
+                'รอบหลักสูตรนี้สิ้นสุดแล้ว',
             );
         }
 
@@ -322,23 +348,31 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
      * @param  list<array<string, mixed>>  $capacityRules
      * @return list<string>
      */
-    private function sourceErrors(object $row, array $categories, array $capacityRules): array
-    {
+    private function sourceErrors(
+        object $row,
+        array $categories,
+        bool $categorySourceValid,
+        array $capacityRules,
+    ): array {
         $errors = [];
         $allowedCategories = ['female', 'male', 'monastic'];
         $allowedApplicantTypes = ['trainee', 'staff'];
 
         try {
-            $startsOn = CarbonImmutable::parse((string) $row->starts_on);
-            $endsOn = CarbonImmutable::parse((string) $row->ends_on);
-            $opensAt = CarbonImmutable::parse((string) $row->registration_opens_at);
-            $closesAt = CarbonImmutable::parse((string) $row->registration_closes_at);
+            $timezone = new DateTimeZone((string) $row->timezone);
+            $startsOn = CarbonImmutable::parse((string) $row->starts_on, $timezone)->startOfDay();
+            $endsOn = CarbonImmutable::parse((string) $row->ends_on, $timezone)->endOfDay();
+            $opensAt = CarbonImmutable::parse((string) $row->registration_opens_at)->setTimezone($timezone);
+            $closesAt = CarbonImmutable::parse((string) $row->registration_closes_at)->setTimezone($timezone);
 
             if ($startsOn->isAfter($endsOn)) {
                 $errors[] = 'invalid-session-date-range';
             }
             if ($opensAt->isAfter($closesAt)) {
                 $errors[] = 'invalid-registration-window';
+            }
+            if ($opensAt->isAfter($startsOn) || $closesAt->isAfter($startsOn)) {
+                $errors[] = 'registration-after-session-start';
             }
         } catch (\Throwable) {
             $errors[] = 'invalid-date';
@@ -363,7 +397,8 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
         }
 
         if (
-            $categories === []
+            ! $categorySourceValid
+            || $categories === []
             || count($categories) !== count(array_unique($categories))
             || array_diff($categories, $allowedCategories) !== []
         ) {
@@ -392,5 +427,20 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
         }
 
         return array_values(array_unique($errors));
+    }
+
+    /**
+     * @param  array<string, mixed>  $session
+     */
+    private function sessionHasEnded(array $session): bool
+    {
+        try {
+            $timezone = new DateTimeZone((string) $session['timezone']);
+            $endsAt = CarbonImmutable::parse((string) $session['ends_on'], $timezone)->endOfDay();
+
+            return CarbonImmutable::now()->setTimezone($timezone)->isAfter($endsAt);
+        } catch (\Throwable) {
+            return true;
+        }
     }
 }

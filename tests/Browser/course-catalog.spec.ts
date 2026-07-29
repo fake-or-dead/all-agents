@@ -76,6 +76,10 @@ test("course detail exposes truthful policy and local document outcome", async (
         }),
     ).toBeVisible();
     await expect(page.getByText("เหลือ 2 จาก 30 ที่นั่ง")).toBeVisible();
+    await expect(page.getByText("10 สิงหาคม 2569")).toBeVisible();
+    await expect(
+        page.getByText("1 กรกฎาคม 2569 เวลา 00:00 น. (Asia/Bangkok)"),
+    ).toBeVisible();
     await expect(
         page.getByRole("link", { name: /เปิดแผนที่ภายนอก/ }),
     ).toHaveAttribute("rel", "external noopener");

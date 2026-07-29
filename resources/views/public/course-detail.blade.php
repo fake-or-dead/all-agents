@@ -21,7 +21,7 @@
             <div class="detail-card">
                 <h2>กำหนดการและสถานที่</h2>
                 <dl class="fact-list">
-                    <div><dt>วันที่</dt><dd><time datetime="{{ $course->session['starts_on'] }}">{{ $course->session['starts_on'] }}</time> – <time datetime="{{ $course->session['ends_on'] }}">{{ $course->session['ends_on'] }}</time></dd></div>
+                    <div><dt>วันที่</dt><dd><time datetime="{{ $course->session['starts_on'] }}">{{ $displayDates['starts_on'] }}</time> – <time datetime="{{ $course->session['ends_on'] }}">{{ $displayDates['ends_on'] }}</time></dd></div>
                     <div><dt>ศูนย์</dt><dd>{{ $course->session['center']['name'] }}</dd></div>
                     <div><dt>ที่อยู่</dt><dd>{{ $course->session['center']['address'] }}</dd></div>
                     <div><dt>แผนที่</dt><dd>
@@ -36,8 +36,8 @@
             <div class="detail-card">
                 <h2>นโยบายการรับสมัคร</h2>
                 <dl class="fact-list">
-                    <div><dt>เปิดรับ</dt><dd><time datetime="{{ $course->session['registration_opens_at'] }}">{{ $course->session['registration_opens_at'] }}</time></dd></div>
-                    <div><dt>ปิดรับ</dt><dd><time datetime="{{ $course->session['registration_closes_at'] }}">{{ $course->session['registration_closes_at'] }}</time></dd></div>
+                    <div><dt>เปิดรับ</dt><dd><time datetime="{{ $course->session['registration_opens_at'] }}">{{ $displayDates['registration_opens_at'] }}</time></dd></div>
+                    <div><dt>ปิดรับ</dt><dd><time datetime="{{ $course->session['registration_closes_at'] }}">{{ $displayDates['registration_closes_at'] }}</time></dd></div>
                     <div><dt>อายุ</dt><dd>{{ $course->session['minimum_age'] ?? 'ไม่กำหนด' }}–{{ $course->session['maximum_age'] ?? 'ไม่กำหนด' }} ปี</dd></div>
                     <div><dt>ประเภทผู้สมัคร</dt><dd>{{ $course->session['applicant_type'] === 'trainee' ? 'ผู้เข้าอบรม' : 'ผู้สมัครเจ้าหน้าที่' }}</dd></div>
                 </dl>
