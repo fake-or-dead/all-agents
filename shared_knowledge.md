@@ -129,6 +129,10 @@ previous status under a new timestamp.
 - Long-running Playwright gates run from a root-owned persistent execution
   session and require the final exit code. Partial `13/16` or `15/16` output is
   not evidence.
+- Never run parallel Playwright processes against the same stateful runtime or
+  database. A passed assertion without a terminal exit is not evidence. Run
+  shared-runtime cases serially, await prior real requests and route cleanup,
+  and reset fixtures after request-count contamination.
 - Bind Playwright to an explicit candidate URL and recovery container.
 - Do not reuse partially exercised Redis rate-limit state as a clean full-suite
   environment.

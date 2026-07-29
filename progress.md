@@ -1,6 +1,6 @@
 # Delivery Progress
 
-Last updated: 2026-07-29 16:07 +07
+Last updated: 2026-07-29 17:17 +07
 
 Owner: PM/controller. This is the presentation-ready delivery dashboard. Update
 at each merge, blocker, replacement SHA, runtime change, and hourly checkpoint.
@@ -63,7 +63,7 @@ and the authenticated `GET /account` returned HTTP 200.
 | 3 | Course Catalog canonical ownership | Delivered to `main`/`:8080`; Issue #10 closed | PR #34 merge `e675535`, PR #43 merge `b3ff382`, Browser 26/26, local Catalog checks pass | Keep as release baseline |
 | 4 | Deterministic PHPStan memory gate | Delivered to `main` | PR #38 merge `762ff4c`, PR #43 merge `b3ff382`, CI 4/4 | Keep as release gate |
 | 5 | Safe canonical local seed | Delivered to `main`/`:8080`; Issue #36 closed | PR #42 merge `a9389ac`, PR #43 merge `b3ff382`, fresh local seed/sign-in pass | Keep credentials and reset instructions current |
-| 6 | Profile/application security | Rebased local candidate under final full-suite gate | Issue #12 local `75fc133`; affected backend 27/286, Browser 3/3, static/frontend/artifact/seed sign-in pass; PR #47 blocker merged at `f27a0f0` | Canonical PostgreSQL full suite, then push/PR/CI/dual review |
+| 6 | Profile/application security | PR #48 replacement remediation active | PR #48 current remote `908408c` is invalid after address schema/race Mediums; backend 93/693 and prior exact Browser 5/5 pass; final local state-machine fix is under serial browser proof | One final replacement SHA, fresh CI and dual reciprocal review |
 
 ## Active workstreams
 
@@ -74,9 +74,9 @@ and the authenticated `GET /account` returned HTTP 200.
 | Course Catalog | coding + dual review agents complete | Released to `main`/`:8080`; URLs verified above | None | Keep regression gates |
 | Local seed | coding/review agents complete | Released to `main`/`:8080`; real seeded sign-in verified | None | Keep local-only guard |
 | PHPStan gate | coding/review agents complete | Released to `main`; Issue #37 closed | None | Keep deterministic wrapper gate |
-| Issue #12 member center | coding agent active | Candidate rebased on `f27a0f0` as local `75fc133`; focused/static/browser/artifact gates green | Final canonical PostgreSQL full rerun | Push/open PR only after 100% green |
-| Issues #13–#16 | PM preparation complete | Implementation-ready task packets posted with dependencies and conflict exclusions | Each waits for its predecessor merge | Start #13 after #12 merge/close |
-| Issue #17 | PM preparation agent active | Read-only task packet in progress | Waits for #13–#16 | Publish packet; no code branch |
+| Issue #12 member center | coding agent active | Five prior Mediums fixed and verified; malformed-success + saved-address race are the current batch | Serial exact-artifact browser and final gates | Push replacement only after terminal green evidence |
+| Issues #13–#24 | PM preparation complete | Implementation-ready task packets posted with dependencies and conflict exclusions | Each waits for its predecessor merge | Start #13 after #12 merge/close |
+| Issue #25 | PM preparation agent active | Read-only task packet in progress | Waits for #24 | Publish packet; no code branch |
 
 ## Delivery metrics
 
