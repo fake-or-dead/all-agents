@@ -136,3 +136,16 @@ Every active delivery hour records:
 - Evidence standard applied: browser expiry tests now control time rather than sleep; final runners compare current spec/CSS/snapshot hashes; native arm64 full behavior and native GitHub amd64 pixel truth are reported separately when local emulation crashes Chromium.
 - Delivery result: one independent engineering gate merged, but Course Catalog did not meet the next-hour merge/release target. `localhost:8080` correctly remains on exact main `9749eaec`; no broken Catalog candidate was released.
 - Next-hour target: replace only the Catalog Linux baseline from inspected native CI actual `b816107d`, pass exact GitHub browser 26/26, obtain fresh dual reciprocal approval, merge PR #34, release Catalog to `main` and `localhost:8080`, then rebase Issue #36 seed.
+
+### 2026-07-29 15:07 +07
+
+- Output: PR #34 passed CI 4/4 with Browser 26/26, dual reciprocal review, and merged at `e675535`; Issue #10 closed. PR #41 delivered the rebased PM docs at `40b7327`. PR #42 passed fresh PostgreSQL seed, readiness/smoke, real HTTP sign-in, CI 4/4, and dual reciprocal review; it merged at `a9389ac` and Issue #36 closed. PR #44 corrected the release dashboard and merged at `dda4177`.
+- Parallel output: Issue #12 started from integration `e675535`. Backend contracts, migration, provider, routes, controller, and Thai UI exist without touching the seed-owned files. Phase evidence is posted at Issue comment `5114789252`.
+- Visible runtime: `localhost:8080` remains intentionally pinned to exact `main` `9749eaec`. Course Catalog and the supported seed account are merged only to integration until release PR #43 passes on replacement exact head `dda4177`.
+- Bottleneck: release validation is the critical path. Updating integration while PR #43 is open triggers a replacement head and duplicate exact-SHA CI runs; both backend/browser copies must settle before final review.
+- Loop found: `progress.md` described PR #42 as pending, then PR #42 merged into the same release head. The release diff immediately became internally stale. Acceptance correctly blocked PR #43 before a false PM status reached `main`.
+- Change applied: status claims now move to “delivered” only after authoritative merge/Issue refresh. The correction travelled through PR #44 with its own CI and dual reciprocal review. Hourly retro work uses a separate branch while PR #43 validates, avoiding another integration-head change.
+- Review-process problem found: one PR #41 acceptance comment used unsafe shell quoting and lost every backticked exact literal. Security blocked the verdict because the SHA/run proof was unreadable.
+- Change applied: reviewer comments must preserve literal SHA/run evidence with safe quoting and be rendered/checked before reciprocal approval.
+- Delivery result: Catalog and seed implementation are integrated and inspectable, but the next-hour `main`/`:8080` release target is not complete. Quality gates found two documentation/process defects before release.
+- Next-hour target: finish PR #43 exact `dda4177` CI and fresh dual reciprocal review, merge to `main`, rebuild `localhost:8080`, verify Catalog URLs plus seeded sign-in, then advance Issue #12 through focused/static/browser gates.
