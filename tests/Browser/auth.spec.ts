@@ -4,6 +4,11 @@ import { execFileSync } from "node:child_process";
 
 const password = "browser-password-123";
 
+// Identity rate-limit coverage is intentionally active in the local runtime.
+// Keep these stateful browser journeys sequential so independent flows do not
+// accidentally consume one another's shared client bucket.
+test.describe.configure({ mode: "serial" });
+
 async function registerAccount(
     page: Page,
     unique: string,
@@ -20,7 +25,7 @@ async function registerAccount(
     await expect(page.getByRole("status")).toContainText("ยืนยันอีเมลแล้ว");
     await page.getByLabel("ประเภทเอกสารประจำตัว").selectOption("passport");
     await page.getByLabel("เลขเอกสารประจำตัว").fill(identity);
-    await page.getByLabel("ชื่อ").fill("ทดสอบ");
+    await page.getByLabel("ชื่อ", { exact: true }).fill("ทดสอบ");
     await page.getByLabel("นามสกุล").fill("เบราว์เซอร์");
     await page.getByLabel(/^รหัสผ่านใหม่/).fill(password);
     await page.getByLabel("ยืนยันรหัสผ่านใหม่").fill(password);
@@ -57,6 +62,32 @@ async function expectAuthReflow(page: Page) {
     await page.evaluate(() => {
         document.documentElement.style.zoom = "";
     });
+}
+
+async function expectAuthScreenshot(page: Page, name: string) {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(page).toHaveScreenshot(name, {
+        animations: "disabled",
+        caret: "hide",
+        fullPage: true,
+    });
+}
+
+async function expectNativeInvalidSubmit(
+    page: Page,
+    submitButtonName: string,
+    firstInvalidLabel: string | RegExp,
+) {
+    const input = page.getByLabel(firstInvalidLabel, {
+        exact: typeof firstInvalidLabel === "string",
+    });
+    await page.getByRole("button", { name: submitButtonName }).click();
+    await expect(input).toBeFocused();
+    expect(
+        await input.evaluate((element: HTMLInputElement) =>
+            element.checkValidity(),
+        ),
+    ).toBe(false);
 }
 
 async function keyboardFill(
@@ -124,6 +155,7 @@ test("FLOW-AUTH-01 registration is Thai-first, accessible, responsive, and signs
             })
             .getByText("local-fixture-v1"),
     ).toBeVisible();
+    await expectAuthScreenshot(page, "auth-signup.png");
     await expectFullDocumentAxe(page);
 
     await page.getByLabel("อีเมล").fill(`stale-${unique}@example.test`);
@@ -136,10 +168,67 @@ test("FLOW-AUTH-01 registration is Thai-first, accessible, responsive, and signs
 
     await registerAccount(page, unique);
     await expectFullDocumentAxe(page);
+    await expectAuthScreenshot(page, "auth-account.png");
     await page.getByRole("button", { name: "ออกจากระบบ" }).click();
     await expect(page).toHaveURL(/\/signin$/);
 
     await expectAuthReflow(page);
+});
+
+test("FLOW-AUTH-00 native invalid submissions focus the first invalid control", async ({
+    page,
+}, testInfo) => {
+    const unique = `${Date.now()}${testInfo.workerIndex}0`;
+
+    await page.goto("/signup");
+    await page
+        .locator("form")
+        .evaluate((form: HTMLFormElement) => form.requestSubmit());
+    await expect(page.getByLabel("อีเมล")).toBeFocused();
+    expect(
+        await page
+            .getByLabel("อีเมล")
+            .evaluate((element: HTMLInputElement) => element.checkValidity()),
+    ).toBe(false);
+
+    const account = await registerAccount(page, unique);
+    await page.getByRole("button", { name: "ออกจากระบบ" }).click();
+    await expect(page).toHaveURL(/\/signin$/);
+
+    await page.goto("/signin");
+    await expectNativeInvalidSubmit(page, "เข้าสู่ระบบ", "เลขเอกสารประจำตัว");
+
+    await page.goto("/forgot");
+    await expectNativeInvalidSubmit(page, "ขอลิงก์กู้คืน", "อีเมล");
+
+    await page.getByLabel("อีเมล").fill(account.email);
+    await page.getByRole("button", { name: "ขอลิงก์กู้คืน" }).click();
+    const recoveryPath = recoveryPathFor(account.email);
+    await page.goto(recoveryPath);
+    await expectNativeInvalidSubmit(page, "ตั้งรหัสผ่านใหม่", "รหัสผ่านใหม่");
+
+    await page.goto("/signin");
+    await page.getByLabel("ประเภทเอกสารประจำตัว").selectOption("passport");
+    await page.getByLabel("เลขเอกสารประจำตัว").fill(account.identity);
+    await page.getByLabel("รหัสผ่าน").fill(password);
+    await page.getByRole("button", { name: "เข้าสู่ระบบ" }).click();
+    await expect(page).toHaveURL(/\/account$/);
+    await expectNativeInvalidSubmit(
+        page,
+        "เปลี่ยนรหัสผ่าน",
+        "รหัสผ่านปัจจุบัน",
+    );
+});
+
+test("FLOW-AUTH-00 public auth visual baselines", async ({ page }) => {
+    await page.goto("/signin");
+    await expectAuthScreenshot(page, "auth-signin.png");
+
+    await page.goto("/forgot");
+    await expectAuthScreenshot(page, "auth-forgot.png");
+
+    await page.goto(`/recover/${"a".repeat(64)}`);
+    await expectAuthScreenshot(page, "auth-recover.png");
 });
 
 test("FLOW-AUTH-01 verified proof expires while filling the form and can be re-verified without reload", async ({
@@ -191,6 +280,7 @@ test("FLOW-AUTH-02 sign-in handles failures, keyboard, zoom, and restores access
     );
     await page.getByRole("button", { name: "ออกจากระบบ" }).click();
     await expect(page).toHaveURL(/\/signin$/);
+    await expectAuthScreenshot(page, "auth-signin-journey.png");
 
     await page.keyboard.press("Tab");
     await expect(page.locator(".skip-link")).toBeFocused();
@@ -354,7 +444,7 @@ test("FLOW-AUTH-04 keyboard-only registration, sign-in, recovery, and password c
     await expect(page.locator("fieldset")).toBeEnabled();
     await page.getByLabel("ประเภทเอกสารประจำตัว").selectOption("passport");
     await keyboardFill(page.getByLabel("เลขเอกสารประจำตัว"), identity);
-    await keyboardFill(page.getByLabel("ชื่อ"), "ทดสอบ");
+    await keyboardFill(page.getByLabel("ชื่อ", { exact: true }), "ทดสอบ");
     await keyboardFill(page.getByLabel("นามสกุล"), "คีย์บอร์ด");
     await keyboardFill(page.getByLabel(/^รหัสผ่านใหม่/), password);
     await keyboardFill(page.getByLabel("ยืนยันรหัสผ่านใหม่"), password);
@@ -418,6 +508,7 @@ test("FLOW-AUTH-04 keyboard-only registration, sign-in, recovery, and password c
     await page.unroute("**/account/password");
 
     await page.getByRole("button", { name: "ออกจากระบบ" }).click();
+    await expect(page).toHaveURL(/\/signin$/);
     await page.goto("/forgot");
     await keyboardFill(page.getByLabel("อีเมล"), email);
     await keyboardActivate(page.getByRole("button", { name: "ขอลิงก์กู้คืน" }));

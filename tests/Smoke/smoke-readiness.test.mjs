@@ -114,6 +114,14 @@ test(
                 return;
             }
 
+            if (request.url === "/recover/caddy-smoke-non-secret") {
+                response.setHeader("referrer-policy", "no-referrer");
+                response.setHeader("cache-control", "no-store");
+                response.writeHead(404);
+                response.end('{"status":"missing"}');
+                return;
+            }
+
             response.writeHead(404);
             response.end('{"status":"missing"}');
         });
@@ -126,6 +134,10 @@ test(
         assert.equal(result.signal, null);
         assert.equal(result.code, 0, result.stderr);
         assert.match(result.stdout, /Smoke checks passed/);
+        assert.match(
+            result.stdout,
+            /Smoke check passed: recovery-token headers/,
+        );
         assert.ok(readinessAttempts >= 2, result.stdout);
         assert.ok(
             elapsed >= 1_800,

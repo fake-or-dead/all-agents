@@ -22,6 +22,7 @@ export default function Register({ consent, csrfToken }: Props) {
     const codeInput = useRef<HTMLInputElement>(null);
     const requestCodeButton = useRef<HTMLButtonElement>(null);
     const errorMessage = useRef<HTMLParagraphElement>(null);
+    const requestGeneration = useRef(0);
 
     function clearVerification() {
         setRegistrationToken("");
@@ -39,7 +40,9 @@ export default function Register({ consent, csrfToken }: Props) {
 
         const expiresAt = Date.parse(proofExpiresAt);
         const expireProof = () => {
+            requestGeneration.current += 1;
             clearVerification();
+            setBusy(false);
             setStatus(
                 "การยืนยันอีเมลหมดอายุ กรุณาขอรหัสและยืนยันใหม่ก่อนกรอกข้อมูลบัญชีต่อ",
             );
@@ -57,6 +60,7 @@ export default function Register({ consent, csrfToken }: Props) {
     }, [proofExpiresAt]);
 
     async function requestCode(form: HTMLFormElement) {
+        const generation = ++requestGeneration.current;
         setBusy(true);
         setError("");
         clearVerification();
@@ -66,6 +70,8 @@ export default function Register({ consent, csrfToken }: Props) {
             csrfToken,
             { email: data.email },
         );
+        if (generation !== requestGeneration.current) return;
+
         if (result.ok) {
             setStatus(String(result.body.message ?? ""));
             codeInput.current?.focus();
@@ -76,6 +82,7 @@ export default function Register({ consent, csrfToken }: Props) {
     }
 
     async function verifyCode(form: HTMLFormElement) {
+        const generation = ++requestGeneration.current;
         setBusy(true);
         setError("");
         const data = formValues(form);
@@ -84,6 +91,7 @@ export default function Register({ consent, csrfToken }: Props) {
             csrfToken,
             { email: data.email, code: data.code },
         );
+        if (generation !== requestGeneration.current) return;
 
         if (result.ok) {
             setRegistrationToken(String(result.body.registration_token ?? ""));
@@ -102,6 +110,7 @@ export default function Register({ consent, csrfToken }: Props) {
     }
 
     async function register(form: HTMLFormElement) {
+        const generation = requestGeneration.current;
         setBusy(true);
         setError("");
         const data = formValues(form);
@@ -125,6 +134,7 @@ export default function Register({ consent, csrfToken }: Props) {
             consent_accepted: data.consent_accepted === "yes",
             consent_version: consent.id,
         });
+        if (generation !== requestGeneration.current) return;
 
         if (result.ok) {
             window.location.assign(String(result.body.redirect ?? "/account"));
@@ -170,6 +180,7 @@ export default function Register({ consent, csrfToken }: Props) {
                                     .trim()
                                     .toLowerCase() !== verifiedEmail
                             ) {
+                                requestGeneration.current += 1;
                                 clearVerification();
                                 setStatus("");
                             }
@@ -266,7 +277,8 @@ export default function Register({ consent, csrfToken }: Props) {
                             spellCheck={false}
                         />
                         <p className="field-help">
-                            วางรหัสที่ได้รับจากผู้ดูแลในช่องนี้เท่านั้น ห้ามส่งผ่านลิงก์
+                            วางรหัสที่ได้รับจากผู้ดูแลในช่องนี้เท่านั้น
+                            ห้ามส่งผ่านลิงก์
                         </p>
                     </div>
                     <div className="field-grid">
