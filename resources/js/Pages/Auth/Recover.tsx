@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AuthShell from "./AuthShell";
 import { formValues, submitJson } from "./auth-http";
 
@@ -7,6 +7,11 @@ type Props = { csrfToken: string; token: string };
 export default function Recover({ csrfToken, token }: Props) {
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
+    const errorMessage = useRef<HTMLParagraphElement>(null);
+
+    useEffect(() => {
+        if (error) errorMessage.current?.focus();
+    }, [error]);
 
     return (
         <AuthShell title="ตั้งรหัสผ่านใหม่" eyebrow="ความปลอดภัยบัญชี">
@@ -50,6 +55,8 @@ export default function Recover({ csrfToken, token }: Props) {
                         type="password"
                         minLength={12}
                         autoComplete="new-password"
+                        aria-describedby={error ? "recover-error" : undefined}
+                        aria-invalid={Boolean(error)}
                         required
                     />
                 </div>
@@ -63,6 +70,8 @@ export default function Recover({ csrfToken, token }: Props) {
                         type="password"
                         minLength={12}
                         autoComplete="new-password"
+                        aria-describedby={error ? "recover-error" : undefined}
+                        aria-invalid={Boolean(error)}
                         required
                     />
                 </div>
@@ -71,7 +80,13 @@ export default function Recover({ csrfToken, token }: Props) {
                 </button>
             </form>
             {error && (
-                <p className="form-error" role="alert">
+                <p
+                    id="recover-error"
+                    className="form-error"
+                    role="alert"
+                    tabIndex={-1}
+                    ref={errorMessage}
+                >
                     {error}
                 </p>
             )}

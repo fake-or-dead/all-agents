@@ -20,6 +20,7 @@ export default function Register({ consent, csrfToken }: Props) {
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
     const codeInput = useRef<HTMLInputElement>(null);
+    const requestCodeButton = useRef<HTMLButtonElement>(null);
     const errorMessage = useRef<HTMLParagraphElement>(null);
 
     function clearVerification() {
@@ -32,6 +33,28 @@ export default function Register({ consent, csrfToken }: Props) {
         if (!error) return;
         errorMessage.current?.focus();
     }, [error]);
+
+    useEffect(() => {
+        if (!proofExpiresAt) return;
+
+        const expiresAt = Date.parse(proofExpiresAt);
+        const expireProof = () => {
+            clearVerification();
+            setStatus(
+                "การยืนยันอีเมลหมดอายุ กรุณาขอรหัสและยืนยันใหม่ก่อนกรอกข้อมูลบัญชีต่อ",
+            );
+            requestCodeButton.current?.focus();
+        };
+        const delay = expiresAt - Date.now();
+
+        if (!Number.isFinite(expiresAt) || delay <= 0) {
+            expireProof();
+            return;
+        }
+
+        const timer = window.setTimeout(expireProof, delay);
+        return () => window.clearTimeout(timer);
+    }, [proofExpiresAt]);
 
     async function requestCode(form: HTMLFormElement) {
         setBusy(true);
@@ -136,6 +159,10 @@ export default function Register({ consent, csrfToken }: Props) {
                         name="email"
                         type="email"
                         autoComplete="email"
+                        aria-describedby={
+                            error ? "registration-error" : undefined
+                        }
+                        aria-invalid={Boolean(error)}
                         onChange={(event) => {
                             if (
                                 verifiedEmail &&
@@ -161,6 +188,10 @@ export default function Register({ consent, csrfToken }: Props) {
                             maxLength={6}
                             autoComplete="one-time-code"
                             ref={codeInput}
+                            aria-describedby={
+                                error ? "registration-error" : undefined
+                            }
+                            aria-invalid={Boolean(error)}
                             required
                         />
                     </div>
@@ -168,6 +199,7 @@ export default function Register({ consent, csrfToken }: Props) {
                         type="button"
                         className="button-secondary"
                         disabled={busy}
+                        ref={requestCodeButton}
                         onClick={(event) =>
                             void requestCode(event.currentTarget.form!)
                         }
@@ -195,6 +227,10 @@ export default function Register({ consent, csrfToken }: Props) {
                         <select
                             id="identity_type"
                             name="identity_type"
+                            aria-describedby={
+                                error ? "registration-error" : undefined
+                            }
+                            aria-invalid={Boolean(error)}
                             required
                         >
                             <option value="personal_id">
@@ -211,6 +247,10 @@ export default function Register({ consent, csrfToken }: Props) {
                             id="identity_number"
                             name="identity_number"
                             autoComplete="off"
+                            aria-describedby={
+                                error ? "registration-error" : undefined
+                            }
+                            aria-invalid={Boolean(error)}
                             required
                         />
                     </div>
@@ -236,6 +276,10 @@ export default function Register({ consent, csrfToken }: Props) {
                                 id="given_name"
                                 name="given_name"
                                 autoComplete="given-name"
+                                aria-describedby={
+                                    error ? "registration-error" : undefined
+                                }
+                                aria-invalid={Boolean(error)}
                                 required
                             />
                         </div>
@@ -245,6 +289,10 @@ export default function Register({ consent, csrfToken }: Props) {
                                 id="family_name"
                                 name="family_name"
                                 autoComplete="family-name"
+                                aria-describedby={
+                                    error ? "registration-error" : undefined
+                                }
+                                aria-invalid={Boolean(error)}
                                 required
                             />
                         </div>
@@ -260,6 +308,10 @@ export default function Register({ consent, csrfToken }: Props) {
                             type="password"
                             minLength={12}
                             autoComplete="new-password"
+                            aria-describedby={
+                                error ? "registration-error" : undefined
+                            }
+                            aria-invalid={Boolean(error)}
                             required
                         />
                     </div>
@@ -273,6 +325,10 @@ export default function Register({ consent, csrfToken }: Props) {
                             type="password"
                             minLength={12}
                             autoComplete="new-password"
+                            aria-describedby={
+                                error ? "registration-error" : undefined
+                            }
+                            aria-invalid={Boolean(error)}
                             required
                         />
                     </div>
@@ -281,6 +337,10 @@ export default function Register({ consent, csrfToken }: Props) {
                             name="consent_accepted"
                             type="checkbox"
                             value="yes"
+                            aria-describedby={
+                                error ? "registration-error" : undefined
+                            }
+                            aria-invalid={Boolean(error)}
                             required
                         />
                         <span>
@@ -311,6 +371,7 @@ export default function Register({ consent, csrfToken }: Props) {
             </p>
             {error && (
                 <p
+                    id="registration-error"
                     className="form-error"
                     role="alert"
                     tabIndex={-1}

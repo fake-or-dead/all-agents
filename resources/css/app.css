@@ -331,6 +331,11 @@ select:focus-visible {
     background: var(--surface-default);
 }
 
+.button-secondary:hover {
+    color: var(--action-secondary);
+    background: var(--surface-default);
+}
+
 .button-danger {
     margin-top: var(--space-6);
     background: var(--status-blocked);

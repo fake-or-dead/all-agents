@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AuthShell from "./AuthShell";
 import { formValues, submitJson } from "./auth-http";
 
@@ -9,6 +9,11 @@ export default function Account({ csrfToken }: Props) {
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
     const [signingOut, setSigningOut] = useState(false);
+    const errorMessage = useRef<HTMLParagraphElement>(null);
+
+    useEffect(() => {
+        if (error) errorMessage.current?.focus();
+    }, [error]);
 
     return (
         <AuthShell title="ความปลอดภัยบัญชี" eyebrow="บัญชีของฉัน">
@@ -44,6 +49,8 @@ export default function Account({ csrfToken }: Props) {
                         name="current_password"
                         type="password"
                         autoComplete="current-password"
+                        aria-describedby={error ? "account-error" : undefined}
+                        aria-invalid={Boolean(error)}
                         required
                     />
                 </div>
@@ -55,6 +62,8 @@ export default function Account({ csrfToken }: Props) {
                         type="password"
                         minLength={12}
                         autoComplete="new-password"
+                        aria-describedby={error ? "account-error" : undefined}
+                        aria-invalid={Boolean(error)}
                         required
                     />
                 </div>
@@ -68,6 +77,8 @@ export default function Account({ csrfToken }: Props) {
                         type="password"
                         minLength={12}
                         autoComplete="new-password"
+                        aria-describedby={error ? "account-error" : undefined}
+                        aria-invalid={Boolean(error)}
                         required
                     />
                 </div>
@@ -79,7 +90,13 @@ export default function Account({ csrfToken }: Props) {
                 {status}
             </p>
             {error && (
-                <p className="form-error" role="alert">
+                <p
+                    id="account-error"
+                    className="form-error"
+                    role="alert"
+                    tabIndex={-1}
+                    ref={errorMessage}
+                >
                     {error}
                 </p>
             )}

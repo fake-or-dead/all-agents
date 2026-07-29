@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AuthShell from "./AuthShell";
 import { formValues, submitJson } from "./auth-http";
 
@@ -7,6 +7,11 @@ type Props = { csrfToken: string };
 export default function SignIn({ csrfToken }: Props) {
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
+    const errorMessage = useRef<HTMLParagraphElement>(null);
+
+    useEffect(() => {
+        if (error) errorMessage.current?.focus();
+    }, [error]);
 
     return (
         <AuthShell title="เข้าสู่ระบบ" eyebrow="บัญชีผู้สมัคร">
@@ -41,7 +46,12 @@ export default function SignIn({ csrfToken }: Props) {
             >
                 <div className="field">
                     <label htmlFor="identity_type">ประเภทเอกสารประจำตัว</label>
-                    <select id="identity_type" name="identity_type">
+                    <select
+                        id="identity_type"
+                        name="identity_type"
+                        aria-describedby={error ? "signin-error" : undefined}
+                        aria-invalid={Boolean(error)}
+                    >
                         <option value="personal_id">เลขประจำตัวประชาชน</option>
                         <option value="passport">หนังสือเดินทาง</option>
                     </select>
@@ -52,6 +62,8 @@ export default function SignIn({ csrfToken }: Props) {
                         id="identity_number"
                         name="identity_number"
                         autoComplete="username"
+                        aria-describedby={error ? "signin-error" : undefined}
+                        aria-invalid={Boolean(error)}
                         required
                     />
                 </div>
@@ -62,6 +74,8 @@ export default function SignIn({ csrfToken }: Props) {
                         name="password"
                         type="password"
                         autoComplete="current-password"
+                        aria-describedby={error ? "signin-error" : undefined}
+                        aria-invalid={Boolean(error)}
                         required
                     />
                 </div>
@@ -70,7 +84,13 @@ export default function SignIn({ csrfToken }: Props) {
                 </button>
             </form>
             {error && (
-                <p className="form-error" role="alert">
+                <p
+                    id="signin-error"
+                    className="form-error"
+                    role="alert"
+                    tabIndex={-1}
+                    ref={errorMessage}
+                >
                     {error}
                 </p>
             )}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AuthShell from "./AuthShell";
 import { formValues, submitJson } from "./auth-http";
 
@@ -8,6 +8,11 @@ export default function Forgot({ csrfToken }: Props) {
     const [status, setStatus] = useState("");
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
+    const errorMessage = useRef<HTMLParagraphElement>(null);
+
+    useEffect(() => {
+        if (error) errorMessage.current?.focus();
+    }, [error]);
 
     return (
         <AuthShell title="กู้คืนการเข้าถึง" eyebrow="ความปลอดภัยบัญชี">
@@ -46,6 +51,8 @@ export default function Forgot({ csrfToken }: Props) {
                         name="email"
                         type="email"
                         autoComplete="email"
+                        aria-describedby={error ? "forgot-error" : undefined}
+                        aria-invalid={Boolean(error)}
                         required
                     />
                 </div>
@@ -57,7 +64,13 @@ export default function Forgot({ csrfToken }: Props) {
                 {status}
             </p>
             {error && (
-                <p className="form-error" role="alert">
+                <p
+                    id="forgot-error"
+                    className="form-error"
+                    role="alert"
+                    tabIndex={-1}
+                    ref={errorMessage}
+                >
                     {error}
                 </p>
             )}
