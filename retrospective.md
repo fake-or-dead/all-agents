@@ -151,3 +151,166 @@ Every active delivery hour records:
 - Change applied: inspect the exact volume and stop only Tapoda containers before recovery. Because this release explicitly required a fresh local seed, remove only `tapoda-next_postgres-data`, state that the old local data is unrecoverable without backup, recreate it with the current `.env`, and rerun the reviewed seed. Future rebuilds must preserve `.env` with the named volume or perform this explicit reset instead of treating an authentication failure as an application defect.
 - Delivery result: Catalog and seed implementation are integrated and inspectable, but the next-hour `main`/`:8080` release target is not complete. Quality gates found two documentation/process defects before release.
 - Next-hour target: finish PR #43 exact `dda4177` CI and fresh dual reciprocal review, merge to `main`, rebuild `localhost:8080`, verify Catalog URLs plus seeded sign-in, then advance Issue #12 through focused/static/browser gates.
+
+### 2026-07-29 16:07 +07
+
+- Output: PR #43 passed duplicate exact-head CI runs 4/4, dual reciprocal review, and merged to `main` at `b3ff382`. `localhost:8080` now serves exact image `sha256:f4cf9c5cea8b340ca38d812dc65defdc6e5dbd3863e38f57100f1beaf6f1a6b7`; artifact labels, fresh guarded seed, readiness/smoke, Catalog URLs/content, seeded HTTP sign-in, and authenticated `/account` all passed. PR #45 published the runtime dashboard/retro/shared rule at integration merge `3444bfd`.
+- Issue #12 output: the local Member Center candidate passed Pint 165 files, PHPStan 102/102, architecture, 27 affected backend tests / 286 assertions, all frontend gates, Browser 3/3, exact artifact verification, fresh seed, and seeded browser sign-in on isolated `:18012`. The candidate was committed cleanly and held before push because the canonical full PostgreSQL suite exposed a dependency failure.
+- Bottleneck found: Course detail rendered the raw PostgreSQL session-formatted registration timestamp inside `<time datetime>`. The visible Thai date was correct, but the machine-readable value changed between UTC and Asia/Bangkok sessions. A global `PGTZ=Asia/Bangkok` made Course pass while breaking Identity expiry semantics.
+- Change applied: split the cross-cutting defect into Issue #46 and PR #47 instead of hiding it inside Issue #12. The fix normalizes machine-readable HTML to ISO 8601 Asia/Bangkok, proves the stored instant under PostgreSQL `Etc/UTC`, keeps Thai/Buddhist text unchanged, and uses no `PGTZ`.
+- Test-environment problem found: the isolated Compose suite inherited the root `.env` deterministic verification code, while tests submit `246810`. The first canonical run produced eight HTTP 422 verification failures unrelated to timezone behavior.
+- Change applied: the canonical full-suite contract is UTC PostgreSQL plus explicit `IDENTITY_DETERMINISTIC_CODE=246810`; no timezone override. PR #47 then passed 83 tests / 572 assertions, CI 4/4, dual reciprocal review, and merged at `f27a0f0`; Issue #46 closed.
+- Orchestration output: implementation-ready, dependency-pinned task packets were posted for Issues #13, #14, #15, and #16. Issue #17 preparation is active. These are read-only and define start conditions/conflict exclusions, so they reduce later learning cost without competing with Issue #12 files.
+- Delivery result: the prior next-hour target was met for PR #43, `main`, and `localhost:8080`. Issue #12 reached a reviewed-gate-ready local candidate but was correctly delayed by a real integration contract defect; that blocker is now merged.
+- Next-hour target: complete Issue #12 rebase on `f27a0f0`, pass the canonical full PostgreSQL suite 100%, push/open/review/merge its PR, release the Member Center to `main`/`:8080`, then start Issue #13 from the resulting exact integration SHA.
+
+### 2026-07-29 17:07 +07 (recorded 17:17 +07)
+
+- Checkpoint timing failure: this hourly snapshot was recorded 10 minutes late. The controller stayed inside PR/browser monitoring instead of interrupting at the fixed checkpoint. The missed deadline is a PM process defect, not hidden as an on-time update.
+- Change applied: the fixed `HH:07` checkpoint takes priority over polling and gate monitoring. Record the authoritative snapshot first, even while tests continue, then resume. Prepare the retro branch before the checkpoint and do not depend on a CI result arriving first.
+- Output: PR #47 passed CI 4/4 and dual reciprocal review, merged at `f27a0f0`, and closed Issue #46. Issue #12 rebased, passed the canonical PostgreSQL/Redis full suite, opened PR #48, and completed multiple exact-artifact browser runs. Implementation-ready read-only packets now cover Issues #13 through #24; Issue #25 preparation is active.
+- Review output: the first PR #48 review posted four Mediums covering actionable Thai 422 states, existing-training edit UI, non-stub ApplicationWorkflow timeline, and mutation/audit atomicity. One batched replacement added transactional mutation seams, failure-injection rollback proofs, the owned timeline, and browser journeys. Subsequent review found dependent address-load failure handling, malformed-success schema handling, and a saved-address parent/child request race.
+- Bottleneck: the Member Center's dependent reference-data state machine is the critical path. Each visible failure mode is small, but error, abort, retry, saved-value preservation, parent reset, stale child response, and schema validation interact. Patching one callback at a time creates replacement-SHA review loops.
+- Change applied: treat address references as one fail-closed state machine. Validate the complete unknown response before state replacement, initialize saved parent then child sequentially, and invalidate/abort child generations on every parent start/failure/reset. Tests must cover malformed 200, failed request, abort, delayed stale child, retry, and full-chain recovery.
+- Test-orchestration problem found: two targeted Playwright processes were launched in parallel against one stateful runtime. One assertion passed without a prompt process exit; the race test counted a request started by a post-save refresh before interception. Partial output was discarded.
+- Change applied: Playwright processes that share a database/runtime run serially. Wait for prior real requests and route cleanup, reset fixtures after contamination, and require terminal exit codes. Parallelism remains for disjoint worktrees/runtimes only.
+- Delivery result: the main Catalog/seed runtime remains healthy at exact `b3ff382`, but Issue #12 did not meet the merge/release target. Review found real product and test-state defects; the current PR head is invalid until the final address-state replacement passes serial exact-artifact gates.
+- Next-hour target: finish serial malformed/race/browser and canonical backend gates, push one PR #48 replacement, obtain fresh dual reciprocal approval, merge/close Issue #12, release Member Center to `main`/`:8080`, and merge the accumulated PM retro/dashboard PR.
+
+### 2026-07-29 17:42 +07 — Docker lifecycle incident
+
+- Failure: agents created a new Compose project for isolation on repeated
+  candidate and review runs. No owner tore those projects down. At least 18
+  stale Tapoda Compose projects and more than 70 containers accumulated.
+- Impact: host load reached `34.75`; `/signup` took 15.656 seconds and the
+  verification request produced no response before the normal 30-second
+  Playwright timeout. PostgreSQL recorded two abnormal untracked child exits,
+  terminated all backends, and entered crash recovery. The app then observed
+  `SQLSTATE[08006] ... database system is in recovery mode`.
+- Exclusions: no PostgreSQL row blocker, Redis rate-limit lock, container
+  restart, or OOM kill was present. After concurrent reset/probe activity
+  stopped, the real journey returned to 331 ms GET, 1,131 ms verification
+  request HTTP 202, and 876 ms verification HTTP 200.
+- PM cause: isolation was optimized per test without a total runtime budget,
+  teardown policy, or cleanup owner. The controller accepted new project names
+  and monitored test output without checking Docker inventory.
+- Correction applied: stopped 66 stale containers, then removed 18 stale
+  Compose projects plus four stopped one-shot/standalone containers. Volumes
+  were preserved. `tapoda-next` on `:8080` and
+  `tapoda-issue12-browser` on `:18012` remain; unrelated legacy runtimes remain
+  untouched.
+- Permanent control: stable PostgreSQL/Redis/network/volume are reused.
+  Candidate SHAs replace only the app image/container. The controller owns
+  pre/post-gate inventory and cleanup. Direct PostgreSQL-container exec probes
+  are prohibited; reset, seed, readiness, warmup, and browser work run
+  serially.
+
+### 2026-07-29 18:07 +07
+
+- Checkpoint discipline: recorded at the fixed `18:07` boundary before
+  resuming CI or agent monitoring. This corrects the late `17:07` process
+  failure.
+- Output: PR #48 replacement `e4ce03c` passed exact local frontend, Browser 6/6,
+  backend 93 tests / 693 assertions, Pint, PHPStan, and architecture gates.
+  GitHub backend/frontend/secrets passed, but the authoritative full browser
+  job failed with 26 passed, 1 failed, and 5 not run. PR #49 PM documentation
+  passed CI 4/4 and remains held behind #48.
+- Review output: exact-SHA security review found two Mediums. Password negative
+  flows discarded the useful Thai Identity message and lacked
+  secret-redaction/session-invariance proof. Training creation lacked persisted
+  idempotency, so an ambiguous committed response followed by retry could
+  duplicate the training row and audit.
+- Integration failure: the Member browser fixture was provisioned only when a
+  local container environment variable existed. GitHub CI did not seed it, so
+  the first test never found `member-bkk`; retries then reused the shared
+  verification limiter and returned HTTP 429. The full configuration also ran
+  state-sharing tests with two workers despite the serial-runtime rule.
+- Change in progress: the password RED now passes with 1 test / 41 assertions.
+  Sequential training replay/conflict/scope RED now passes with 1 test / 15
+  assertions using a People-owned same-transaction idempotency claim. Remaining
+  proof is real PostgreSQL concurrency, negative/ambiguous browser coverage,
+  deterministic CI fixture provisioning, the configured-worker full browser
+  suite, and all final gates.
+- Task-sizing failure: #12 and the prepared #13 packet each combined multiple
+  state machines and owners. Review of Issues #14–#32 found all 19 exceed the
+  60–90 minute PR-sized rule; packets span 13,053–37,683 characters and often
+  4–17 routes. Large task packets reduced ambiguity but did not reduce WIP or
+  replacement-SHA blast radius.
+- Change applied: #13 remains the acceptance umbrella and is split into child
+  Issues #50–#54 for Form Engine, start/resume, autosave, atomic submit, and
+  receipt/timeline. Future umbrella Issues are decomposed just in time before
+  coding. Issue #30 is explicitly XL with six local child slices; Issue #31 is
+  explicitly XL with five local rehearsal slices and excludes actual production
+  cutover.
+- Docker result: 18 stale Compose projects and four one-shot containers were
+  removed without deleting volumes. Only `tapoda-next` and one current
+  `tapoda-issue12-browser` candidate project remain for this rebuild. Host load
+  recovered from `34.75` to `9.05`; current PostgreSQL/Redis services remain
+  reused and healthy.
+- Delivery result: #12 is not approved or ready to merge. Review and the full
+  CI gate found real correctness/evidence defects after focused local success.
+  No false release was made; `localhost:8080` remains the last approved main
+  slice.
+- Next-hour target: finish one #12 replacement batch, pass the configured full
+  browser plus backend/static gates, push once, obtain CI 4/4 and fresh dual
+  reciprocal exact-SHA review, merge #48, then release Member Center to
+  `main`/`:8080` and activate child #50.
+
+### 2026-07-29 19:07 +07
+
+- Checkpoint discipline: recorded at the fixed boundary while the final exact
+  browser gate continues. No CI or browser result was awaited before taking the
+  snapshot.
+- Output: #13 now has child Issues #50–#54. Every umbrella #14–#29 has a
+  published PR-sized decomposition comment, and #30–#32 packets explicitly
+  classify themselves as XL multi-PR local scopes. No later coding agent may
+  receive the original umbrella as one batch.
+- PR #48 output: clean one-commit SHA `4b4ecaa` passed GitHub CI 4/4 after the
+  branch history was squashed. Its final tree matched the prior candidate
+  exactly, but fresh reviews correctly rejected it despite green CI.
+- Secret-gate lesson: the first gitleaks repair removed the synthetic
+  password-like literal only from the final tree. Gitleaks scans every commit in
+  the PR range, so the historical offending commit still failed. A safe
+  branch-only squash from exact integration base, exact force-with-lease, local
+  backup ref, tree-equivalence proof, and one clean commit removed it without
+  disabling or allowlisting the detector.
+- Review output: acceptance found a High retry defect. After an ambiguous
+  committed training request, the visible `โหลดใหม่` action destroyed the
+  React-ref-only idempotency key; retry after reload could duplicate the row and
+  audit. Security added that every nonzero 5xx cleared the key and that an
+  unkeyed SHA-256 of low-entropy encrypted training fields leaked equality and
+  dictionary-test material.
+- Change applied locally: pending training creation now persists only an opaque
+  UUID in session storage; no course/provider/date payload is stored. Network
+  failure, 5xx, payload edit, visible reload, and manual reload preserve the
+  key. Confirmed 2xx/replay or explicit reconciled abandonment clears it.
+  Browser proof covers commit+abort, reload, same-key HTTP 200 replay, one DOM
+  row/one audit, 503 then changed-payload 409, and original-payload replay.
+- Data-protection change: the unkeyed digest column is replaced by randomized
+  authenticated encryption of canonical request JSON through the existing
+  Laravel Encrypter. Replay decrypts and constant-compares under the same
+  transaction; corruption fails closed. Equal payloads expose no deterministic
+  database equality material and no plaintext field.
+- Current exact local candidate: `e68d9dd852d80f0f841fc9be8ebd5b16e9ae5ad5`,
+  image
+  `sha256:a0b898b5b085987522b8221bde43723c8f9b99684aa4dd6deea57cda32a65195`.
+  Exact seed/web/worker/scheduler assertions passed on reused
+  `tapoda-issue12-browser` PostgreSQL/Redis/network/volume. Focused backend
+  passed 1/27, PostgreSQL concurrency 1/16, full backend 96/709, service
+  integration 9/68, Member browser 6/6, Pint 166, PHPStan 105, architecture,
+  Composer/npm audit, and all frontend gates. Final exact browser reruns are in
+  progress; nothing is pushed.
+- Docker result: no new project was created. The candidate reused the same
+  four-hour PostgreSQL/Redis services and replaced only exact app containers.
+  Host load is `6.22`, down from the incident peak `34.75`.
+- PM result: PR #49 head `d312eaf` passed CI 4/4 and remains held behind #48.
+  `localhost:8080` remains approved main `b3ff382`; no rejected candidate was
+  released.
+- Delivery result: #12 still misses the merge/release target, but the hour
+  converted two review findings into executable cross-reload and encrypted
+  idempotency contracts, completed task decomposition for every remaining
+  umbrella, and reached full local gates except the terminal browser reruns.
+- Next-hour target: finish exact Member/full browser gates, push one replacement,
+  obtain CI 4/4 and fresh reciprocal security/acceptance approval, merge #48,
+  release Member Center to `main`/`:8080`, merge/rebase PM evidence, and activate
+  child #50 only after the resulting exact integration SHA exists.

@@ -1,6 +1,6 @@
 # Delivery Progress
 
-Last updated: 2026-07-29 15:18 +07
+Last updated: 2026-07-29 19:26 +07
 
 Owner: PM/controller. This is the presentation-ready delivery dashboard. Update
 at each merge, blocker, replacement SHA, runtime change, and hourly checkpoint.
@@ -12,7 +12,8 @@ GitHub Issues remain the task-level source of truth.
   a verified Docker application at `http://localhost:8080`.
 - Explicit exclusions: production approvals, production writes, cutover, and
   destructive legacy retirement.
-- Scope tracker: 12 closed / 20 open.
+- Scope tracker: 11 complete / 21 open. Issue #12 is merged and closed in
+  GitHub, but remains release-pending under the localhost Definition of Done.
 - Default-branch release: PR #43 merged at
   `b3ff3825e289d40b0d202d077c7332d2255cc175`; reviewed head `dda4177`,
   duplicate exact-SHA CI runs both passed 4/4, and dual reciprocal approval is
@@ -23,6 +24,10 @@ GitHub Issues remain the task-level source of truth.
   `sha256:f4cf9c5cea8b340ca38d812dc65defdc6e5dbd3863e38f57100f1beaf6f1a6b7`.
   Fresh local migration/seed, artifact assertion, readiness, smoke, Catalog
   content checks, and seeded HTTP sign-in pass.
+- Integration head `e34bf6c99df8dc2ea6cf69e756f62f034f044cac`
+  merges PR #48's Member Center after exact head `e68d9dd` passed CI 4/4,
+  security and acceptance review, and reciprocal cross-review. Issue #12 is
+  closed. It will ride the next user-visible release.
 
 ## User check URLs
 
@@ -60,23 +65,27 @@ and the authenticated `GET /account` returned HTTP 200.
 | 3 | Course Catalog canonical ownership | Delivered to `main`/`:8080`; Issue #10 closed | PR #34 merge `e675535`, PR #43 merge `b3ff382`, Browser 26/26, local Catalog checks pass | Keep as release baseline |
 | 4 | Deterministic PHPStan memory gate | Delivered to `main` | PR #38 merge `762ff4c`, PR #43 merge `b3ff382`, CI 4/4 | Keep as release gate |
 | 5 | Safe canonical local seed | Delivered to `main`/`:8080`; Issue #36 closed | PR #42 merge `a9389ac`, PR #43 merge `b3ff382`, fresh local seed/sign-in pass | Keep credentials and reset instructions current |
-| 6 | Profile/application security | Implementation active | Issue #12 comment `5114789252`; backend/UI candidate exists | Focused/static/browser gates |
+| 6 | Profile/application security | Delivered to integration; Issue #12 closed; release to `main` pending | PR #48 merge `e34bf6c`; reviewed `e68d9dd`; CI 4/4; security/acceptance PASS and reciprocal AGREE; exact candidate image `a0b898b5...` healthy on reused `:18012` | Merge PM docs, then release integration to `main`/`:8080` |
 
 ## Active workstreams
 
 | Workstream | Owner | Status | Blocker | Next checkpoint |
 | --- | --- | --- | --- | --- |
-| Release control | PM/controller | PR #43 merged at `b3ff382`; exact release live on `:8080` | None | Publish runtime evidence through PR #45 |
+| Release control | PM/controller | PR #43 merged at `b3ff382`; exact release live on `:8080`; PR #45 already merged at `3444bfd` | Member Center integration awaits release | Merge PR #49, then open the small integration-to-main release PR |
 | PM operating system | PM/controller | Delivered and active | None | Refresh dashboard at every phase boundary |
 | Course Catalog | coding + dual review agents complete | Released to `main`/`:8080`; URLs verified above | None | Keep regression gates |
 | Local seed | coding/review agents complete | Released to `main`/`:8080`; real seeded sign-in verified | None | Keep local-only guard |
 | PHPStan gate | coding/review agents complete | Released to `main`; Issue #37 closed | None | Keep deterministic wrapper gate |
-| Issue #12 member center | coding agent active | Implementation task packet posted at Issue comment `5114102073`; isolated branch from integration `e675535` | Must not overlap PR #42 seed files | Produce focused local candidate and issue checkpoint |
+| Issue #12 member center | coding + dual review agents complete | PR #48 merged at `e34bf6c`; Issue #12 closed; exact candidate `e68d9dd` and image `a0b898b5...` remain healthy on reused `:18012` | Main release train | Release after PR #49 |
+| Issue #13 application | PM decomposed | Umbrella retained; child Issues #50–#54 track Form Engine, start/resume, autosave, atomic submit, receipt/timeline; #50 preflight published | Main release of #12 | Branch #50 from exact post-merge integration SHA after release |
+| Issues #14–#32 | PM decomposition complete | #14–#29 have PR-sized decomposition comments; #30–#32 are explicit XL multi-PR local packets with production actions separated | Each waits for predecessor; child Issues created just in time | Never assign original XL packet as one batch |
+| Docker lifecycle | PM/controller | 18 stale Compose projects, four stopped containers, and orphan smoke container `blissful_khayyam` removed; volumes preserved; main and one candidate stack reuse healthy PostgreSQL/Redis | None | Keep only `tapoda-next` and one active candidate project; inventory before/after every heavy gate |
 
 ## Delivery metrics
 
-- Observed first 11 hours: 10/32 scopes closed; three implementation slices
-  reached done or review-ready.
+- Current scope progress: 11/32 scopes complete. Issue #12 is integrated and
+  its tracker is closed, but it becomes scope 12/32 only after the next small
+  `main` release and verified `localhost:8080` rebuild.
 - Naive scope velocity is misleading because #1–#8 are decision gates and later
   lifecycle, migration, report, and staff scopes are larger.
 - Current forecast for local completion: 96–120 continuous hours at the
