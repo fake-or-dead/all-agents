@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Config\Repository;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +26,8 @@ final class LocalIdentityAccessSeeder extends Seeder
 
     public function run(): void
     {
+        $this->assertLocalFixtureRuntime();
+
         $now = CarbonImmutable::parse('2026-07-29T00:00:00+07:00');
         [$peopleKeyVersion, $peopleLookupKey] = $this->currentPeopleLookupKey();
         [$accountKeyVersion, $accountLookupKey] = $this->currentAccountLookupKey();
@@ -86,6 +90,21 @@ final class LocalIdentityAccessSeeder extends Seeder
         });
     }
 
+    private function assertLocalFixtureRuntime(): void
+    {
+        $application = app(Application::class);
+        $config = app(Repository::class);
+
+        if (
+            ! $application->environment(['local', 'testing'])
+            || $config->get('identity-access.verification_adapter') !== 'deterministic-fake'
+        ) {
+            throw new RuntimeException(
+                'Local IdentityAccess fixtures require local/testing with the deterministic-fake verification adapter.',
+            );
+        }
+    }
+
     /** @return array{string, string} */
     private function currentPeopleLookupKey(): array
     {
@@ -107,8 +126,9 @@ final class LocalIdentityAccessSeeder extends Seeder
     /** @return array{string, string} */
     private function currentLookupKey(string $versionPath, string $keysPath): array
     {
-        $version = config($versionPath);
-        $keys = config($keysPath);
+        $config = app(Repository::class);
+        $version = $config->get($versionPath);
+        $keys = $config->get($keysPath);
 
         if (! is_string($version) || ! is_array($keys)) {
             throw new RuntimeException("Missing local seed lookup key for {$versionPath}.");

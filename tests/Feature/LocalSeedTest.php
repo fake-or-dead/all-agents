@@ -2,15 +2,58 @@
 
 namespace Tests\Feature;
 
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 use Tests\TestCase;
 
 final class LocalSeedTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_production_like_runtime_rejects_local_identity_fixture_before_any_write(): void
+    {
+        $this->app->detectEnvironment(static fn (): string => 'production');
+        config()->set('identity-access.verification_adapter', 'deterministic-fake');
+
+        try {
+            $this->app->make(DatabaseSeeder::class)->run();
+            $this->fail('Production-like configuration must reject local identity fixtures.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(
+                'Local IdentityAccess fixtures require local/testing with the deterministic-fake verification adapter.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertDatabaseCount('people', 0);
+        $this->assertDatabaseCount('person_identifiers', 0);
+        $this->assertDatabaseCount('accounts', 0);
+        $this->assertDatabaseCount('credentials', 0);
+    }
+
+    public function test_testing_runtime_rejects_non_deterministic_identity_adapter_before_any_write(): void
+    {
+        config()->set('identity-access.verification_adapter', 'disabled');
+
+        try {
+            $this->app->make(DatabaseSeeder::class)->run();
+            $this->fail('A non-deterministic verifier must reject local identity fixtures.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(
+                'Local IdentityAccess fixtures require local/testing with the deterministic-fake verification adapter.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertDatabaseCount('people', 0);
+        $this->assertDatabaseCount('person_identifiers', 0);
+        $this->assertDatabaseCount('accounts', 0);
+        $this->assertDatabaseCount('credentials', 0);
+    }
 
     public function test_local_seed_creates_one_canonical_account_fixture_without_reowning_consent_documents(): void
     {
