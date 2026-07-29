@@ -63,22 +63,14 @@ final class CourseCatalogSeeder extends Seeder
                     'course_type_id' => 'meditation',
                     'title_th' => 'หลักสูตรปฏิบัติธรรม 10 วัน',
                     'summary_th' => 'ฝึกสติและสมาธิอย่างต่อเนื่องในสภาพแวดล้อมที่เหมาะสม',
-                    'minimum_age' => 20,
-                    'maximum_age' => 70,
-                    'applicant_type' => 'trainee',
-                    'approved_categories' => json_encode(['female', 'male', 'monastic'], JSON_THROW_ON_ERROR),
                 ],
                 [
                     'id' => 'volunteer',
                     'course_type_id' => 'service',
                     'title_th' => 'หลักสูตรเตรียมจิตอาสา',
                     'summary_th' => 'เตรียมความพร้อมสำหรับผู้สมัครเจ้าหน้าที่หลักสูตร',
-                    'minimum_age' => 25,
-                    'maximum_age' => 65,
-                    'applicant_type' => 'staff',
-                    'approved_categories' => json_encode(['female', 'male'], JSON_THROW_ON_ERROR),
                 ],
-            ], ['id'], ['course_type_id', 'title_th', 'summary_th', 'minimum_age', 'maximum_age', 'applicant_type', 'approved_categories']);
+            ], ['id'], ['course_type_id', 'title_th', 'summary_th']);
 
             DB::table('course_sessions')->upsert([
                 [
@@ -90,6 +82,12 @@ final class CourseCatalogSeeder extends Seeder
                     'ends_on' => '2026-08-20',
                     'registration_opens_at' => '2026-07-01 00:00:00+07',
                     'registration_closes_at' => '2026-08-05 23:59:59+07',
+                    'policy_version' => '2026-08-v1',
+                    'timezone' => 'Asia/Bangkok',
+                    'minimum_age' => 20,
+                    'maximum_age' => 70,
+                    'applicant_type' => 'trainee',
+                    'approved_categories' => json_encode(['female', 'male', 'monastic'], JSON_THROW_ON_ERROR),
                     'invite_only' => false,
                     'published' => true,
                 ],
@@ -102,6 +100,12 @@ final class CourseCatalogSeeder extends Seeder
                     'ends_on' => '2026-09-06',
                     'registration_opens_at' => '2026-07-01 00:00:00+07',
                     'registration_closes_at' => '2026-08-20 23:59:59+07',
+                    'policy_version' => '2026-09-v1',
+                    'timezone' => 'Asia/Bangkok',
+                    'minimum_age' => 25,
+                    'maximum_age' => 65,
+                    'applicant_type' => 'staff',
+                    'approved_categories' => json_encode(['female', 'male'], JSON_THROW_ON_ERROR),
                     'invite_only' => true,
                     'published' => true,
                 ],
@@ -114,10 +118,16 @@ final class CourseCatalogSeeder extends Seeder
                     'ends_on' => '2026-06-10',
                     'registration_opens_at' => '2026-04-01 00:00:00+07',
                     'registration_closes_at' => '2026-05-25 23:59:59+07',
+                    'policy_version' => '2026-06-v2',
+                    'timezone' => 'Asia/Bangkok',
+                    'minimum_age' => 40,
+                    'maximum_age' => 75,
+                    'applicant_type' => 'trainee',
+                    'approved_categories' => json_encode(['female', 'male'], JSON_THROW_ON_ERROR),
                     'invite_only' => false,
                     'published' => true,
                 ],
-            ], ['id'], ['code', 'course_id', 'center_id', 'starts_on', 'ends_on', 'registration_opens_at', 'registration_closes_at', 'invite_only', 'published']);
+            ], ['id'], ['code', 'course_id', 'center_id', 'starts_on', 'ends_on', 'registration_opens_at', 'registration_closes_at', 'policy_version', 'timezone', 'minimum_age', 'maximum_age', 'applicant_type', 'approved_categories', 'invite_only', 'published']);
 
             DB::table('teachers')->upsert([
                 ['id' => 'teacher-suda', 'name_th' => 'อาจารย์สุดา', 'active' => true],
@@ -135,17 +145,24 @@ final class CourseCatalogSeeder extends Seeder
                 ['course_session_id' => '10000000-0000-4000-8000-000000000001', 'category' => 'monastic', 'capacity' => 5, 'reserved_count' => 1],
                 ['course_session_id' => '10000000-0000-4000-8000-000000000002', 'category' => 'female', 'capacity' => 10, 'reserved_count' => 4],
                 ['course_session_id' => '10000000-0000-4000-8000-000000000002', 'category' => 'male', 'capacity' => 10, 'reserved_count' => 4],
+                ['course_session_id' => '10000000-0000-4000-8000-000000000003', 'category' => 'female', 'capacity' => 30, 'reserved_count' => 30],
+                ['course_session_id' => '10000000-0000-4000-8000-000000000003', 'category' => 'male', 'capacity' => 25, 'reserved_count' => 25],
             ], ['course_session_id', 'category'], ['capacity', 'reserved_count']);
 
-            DB::table('course_documents')->upsert([
+            DB::table('document_publication_projections')->upsert([
                 [
                     'course_session_id' => '10000000-0000-4000-8000-000000000001',
                     'key' => 'training-intro',
                     'title_th' => 'คู่มือเตรียมตัวเข้าร่วมหลักสูตร',
-                    'compatibility_path' => '/documents/training-intro',
+                    'version' => 1,
+                    'checksum' => hash('sha256', 'local-training-intro-v1'),
+                    'visibility' => 'public',
+                    'approval_state' => 'approved',
+                    'lifecycle_state' => 'active',
+                    'quarantine_reason' => null,
                     'disposition' => 'local-placeholder',
                 ],
-            ], ['course_session_id', 'key'], ['title_th', 'compatibility_path', 'disposition']);
+            ], ['course_session_id', 'key'], ['title_th', 'version', 'checksum', 'visibility', 'approval_state', 'lifecycle_state', 'quarantine_reason', 'disposition']);
         });
     }
 }

@@ -2,20 +2,26 @@
 
 namespace App\Modules\CourseCatalog\Infrastructure\Persistence;
 
-use App\Modules\CourseCatalog\Contracts\ApplicationFacts;
+use App\Modules\ApplicationWorkflow\Contracts\ApplicationFacts;
 use App\Modules\CourseCatalog\Contracts\CourseCatalog;
 use App\Modules\CourseCatalog\Data\CourseSearch;
 use App\Modules\CourseCatalog\Data\CourseSearchResult;
 use App\Modules\CourseCatalog\Data\CourseSessionView;
 use App\Modules\CourseCatalog\Data\EligibilityContext;
 use App\Modules\CourseCatalog\Data\EligibilityResult;
+use App\Modules\CourseCatalog\Data\HttpsUrl;
+use App\Modules\DocumentsConsent\Contracts\PublicCourseDocuments;
 use Carbon\CarbonImmutable;
+use DateTimeZone;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 final readonly class DatabaseCourseCatalog implements CourseCatalog
 {
-    public function __construct(private ApplicationFacts $applicationFacts) {}
+    public function __construct(
+        private ApplicationFacts $applicationFacts,
+        private PublicCourseDocuments $documents,
+    ) {}
 
     public function search(CourseSearch $search): CourseSearchResult
     {
@@ -90,24 +96,24 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
                 'category' => (string) $rule->category,
                 'capacity' => (int) $rule->capacity,
                 'reserved_count' => (int) $rule->reserved_count,
-                'remaining' => max(0, (int) $rule->capacity - (int) $rule->reserved_count),
+                'remaining' => (int) $rule->capacity - (int) $rule->reserved_count,
             ])->all();
 
-        $documents = DB::table('course_documents')
-            ->where('course_session_id', $row->id)
-            ->orderBy('title_th')
-            ->get()
-            ->map(fn (object $document): array => [
-                'key' => (string) $document->key,
-                'title' => (string) $document->title_th,
-                'url' => (string) $document->compatibility_path,
-                'disposition' => (string) $document->disposition,
-            ])->all();
+        $documents = array_map(static fn ($document): array => [
+            'key' => $document->key,
+            'title' => $document->title,
+            'url' => route('public.document-placeholder', ['documentKey' => $document->key], false),
+            'version' => $document->version,
+            'checksum' => $document->checksum,
+            'disposition' => $document->disposition,
+        ], $this->documents->forSession((string) $row->id));
 
         $approvedCategories = json_decode((string) $row->approved_categories, true);
         $categories = is_array($approvedCategories)
             ? array_values(array_filter($approvedCategories, 'is_string'))
             : [];
+        $mapUrl = HttpsUrl::fromUntrusted((string) $row->map_url);
+        $sourceErrors = $this->sourceErrors($row, $categories, $capacityRules);
 
         $session = [
             'id' => (string) $row->id,
@@ -118,7 +124,7 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
             'center' => [
                 'name' => (string) $row->center_name,
                 'address' => (string) $row->address_th,
-                'map_url' => (string) $row->map_url,
+                'map_url' => $mapUrl?->value,
             ],
             'starts_on' => (string) $row->starts_on,
             'ends_on' => (string) $row->ends_on,
@@ -126,6 +132,8 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
             'registration_closes_at' => (string) $row->registration_closes_at,
             'registration_status' => $this->registrationStatus($row),
             'invite_only' => (bool) $row->invite_only,
+            'policy_version' => (string) $row->policy_version,
+            'timezone' => (string) $row->timezone,
             'minimum_age' => $row->minimum_age === null ? null : (int) $row->minimum_age,
             'maximum_age' => $row->maximum_age === null ? null : (int) $row->maximum_age,
             'applicant_type' => (string) $row->applicant_type,
@@ -133,6 +141,7 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
             'teachers' => $teachers,
             'capacity_rules' => $capacityRules,
             'documents' => $documents,
+            'source_errors' => $sourceErrors,
         ];
 
         return new CourseSessionView(
@@ -151,10 +160,6 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
                 'course_sessions.*',
                 'courses.title_th',
                 'courses.summary_th',
-                'courses.minimum_age',
-                'courses.maximum_age',
-                'courses.applicant_type',
-                'courses.approved_categories',
                 'course_types.name_th as course_type_name',
                 'centers.name_th as center_name',
                 'centers.address_th',
@@ -182,8 +187,12 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
      */
     private function registrationStatus(object|array $session): string
     {
-        $opensAt = CarbonImmutable::parse(data_get($session, 'registration_opens_at'));
-        $closesAt = CarbonImmutable::parse(data_get($session, 'registration_closes_at'));
+        try {
+            $opensAt = CarbonImmutable::parse(data_get($session, 'registration_opens_at'));
+            $closesAt = CarbonImmutable::parse(data_get($session, 'registration_closes_at'));
+        } catch (\Throwable) {
+            return 'invalid';
+        }
         $now = CarbonImmutable::now();
 
         if ($now->isBefore($opensAt)) {
@@ -206,6 +215,15 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
         array $capacityRules,
         EligibilityContext $context,
     ): EligibilityResult {
+        if ($session['source_errors'] !== []) {
+            return new EligibilityResult(
+                'unavailable',
+                'invalid-source-state',
+                'ข้อมูลนโยบายรอบหลักสูตรไม่สมบูรณ์ ระบบระงับการประเมินไว้',
+                $session['source_errors'],
+            );
+        }
+
         if ($session['invite_only'] === true) {
             return new EligibilityResult(
                 'unavailable',
@@ -297,5 +315,82 @@ final readonly class DatabaseCourseCatalog implements CourseCatalog
                 ? 'ผ่านเกณฑ์เบื้องต้น กรุณาเข้าสู่ระบบเพื่อตรวจสอบใบสมัครเดิมก่อนสมัคร'
                 : 'ผ่านเกณฑ์การสมัครหลักสูตรนี้',
         );
+    }
+
+    /**
+     * @param  list<string>  $categories
+     * @param  list<array<string, mixed>>  $capacityRules
+     * @return list<string>
+     */
+    private function sourceErrors(object $row, array $categories, array $capacityRules): array
+    {
+        $errors = [];
+        $allowedCategories = ['female', 'male', 'monastic'];
+        $allowedApplicantTypes = ['trainee', 'staff'];
+
+        try {
+            $startsOn = CarbonImmutable::parse((string) $row->starts_on);
+            $endsOn = CarbonImmutable::parse((string) $row->ends_on);
+            $opensAt = CarbonImmutable::parse((string) $row->registration_opens_at);
+            $closesAt = CarbonImmutable::parse((string) $row->registration_closes_at);
+
+            if ($startsOn->isAfter($endsOn)) {
+                $errors[] = 'invalid-session-date-range';
+            }
+            if ($opensAt->isAfter($closesAt)) {
+                $errors[] = 'invalid-registration-window';
+            }
+        } catch (\Throwable) {
+            $errors[] = 'invalid-date';
+        }
+
+        if (! in_array((string) $row->timezone, DateTimeZone::listIdentifiers(), true)) {
+            $errors[] = 'invalid-timezone';
+        }
+
+        $minimumAge = $row->minimum_age === null ? null : (int) $row->minimum_age;
+        $maximumAge = $row->maximum_age === null ? null : (int) $row->maximum_age;
+        if (
+            ($minimumAge !== null && ($minimumAge < 1 || $minimumAge > 120))
+            || ($maximumAge !== null && ($maximumAge < 1 || $maximumAge > 120))
+            || ($minimumAge !== null && $maximumAge !== null && $minimumAge > $maximumAge)
+        ) {
+            $errors[] = 'invalid-age-range';
+        }
+
+        if (! in_array((string) $row->applicant_type, $allowedApplicantTypes, true)) {
+            $errors[] = 'invalid-applicant-type';
+        }
+
+        if (
+            $categories === []
+            || count($categories) !== count(array_unique($categories))
+            || array_diff($categories, $allowedCategories) !== []
+        ) {
+            $errors[] = 'invalid-categories';
+        }
+
+        $capacityCategories = [];
+        foreach ($capacityRules as $rule) {
+            $capacityCategories[] = $rule['category'];
+            if (
+                ! in_array($rule['category'], $categories, true)
+                || $rule['capacity'] < 1
+                || $rule['reserved_count'] < 0
+                || $rule['reserved_count'] > $rule['capacity']
+            ) {
+                $errors[] = 'invalid-capacity';
+                break;
+            }
+        }
+        if (array_diff($categories, $capacityCategories) !== []) {
+            $errors[] = 'missing-capacity';
+        }
+
+        if (trim((string) $row->policy_version) === '') {
+            $errors[] = 'missing-policy-version';
+        }
+
+        return array_values(array_unique($errors));
     }
 }

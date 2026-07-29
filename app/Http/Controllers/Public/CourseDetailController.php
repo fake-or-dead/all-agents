@@ -5,38 +5,73 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Modules\CourseCatalog\Contracts\CourseCatalog;
 use App\Modules\CourseCatalog\Data\EligibilityContext;
-use App\Modules\IdentityAccess\Contracts\ActorResolver;
+use App\Modules\IdentityAccess\Contracts\ApplicantIdentityResolver;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class CourseDetailController extends Controller
 {
-    public function __invoke(
+    public function show(
+        string $courseCode,
+        CourseCatalog $catalog,
+    ): View {
+        return $this->view($courseCode, $catalog, new EligibilityContext(null, null, null, null), [], [
+            'age' => '',
+            'category' => '',
+            'applicant_type' => '',
+        ]);
+    }
+
+    public function assess(
         Request $request,
         string $courseCode,
         CourseCatalog $catalog,
-        ActorResolver $actors,
-    ): View {
-        $actor = $actors->resolve($request);
+        ApplicantIdentityResolver $identities,
+    ): Response {
+        $identity = $identities->resolve($request);
         $inputErrors = [];
         $context = new EligibilityContext(
-            $this->age($request->query('age'), $inputErrors),
+            $this->age($request->input('age'), $inputErrors),
             $this->choice(
-                $request->query('category'),
+                $request->input('category'),
                 ['female', 'male', 'monastic'],
                 'category',
                 $inputErrors,
             ),
             $this->choice(
-                $request->query('applicant_type'),
+                $request->input('applicant_type'),
                 ['trainee', 'staff'],
                 'applicant_type',
                 $inputErrors,
             ),
-            $actor?->id,
+            $identity?->personId,
         );
 
+        $view = $this->view($courseCode, $catalog, $context, $inputErrors, [
+            'age' => $request->input('age', ''),
+            'category' => $request->input('category', ''),
+            'applicant_type' => $request->input('applicant_type', ''),
+        ]);
+
+        return response()
+            ->view($view->name(), $view->getData())
+            ->header('Cache-Control', 'private, no-store')
+            ->header('Referrer-Policy', 'no-referrer');
+    }
+
+    /**
+     * @param  array<string, string>  $inputErrors
+     * @param  array{age: mixed, category: mixed, applicant_type: mixed}  $eligibilityInput
+     */
+    private function view(
+        string $courseCode,
+        CourseCatalog $catalog,
+        EligibilityContext $context,
+        array $inputErrors,
+        array $eligibilityInput,
+    ): View {
         $view = $catalog->session($courseCode, $context);
         if ($view === null) {
             throw new NotFoundHttpException;
@@ -44,11 +79,7 @@ final class CourseDetailController extends Controller
 
         return view('public.course-detail', [
             'course' => $view,
-            'eligibilityInput' => [
-                'age' => $request->query('age', ''),
-                'category' => $request->query('category', ''),
-                'applicant_type' => $request->query('applicant_type', ''),
-            ],
+            'eligibilityInput' => $eligibilityInput,
             'inputErrors' => $inputErrors,
         ]);
     }

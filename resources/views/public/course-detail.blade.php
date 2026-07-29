@@ -24,7 +24,13 @@
                     <div><dt>วันที่</dt><dd><time datetime="{{ $course->session['starts_on'] }}">{{ $course->session['starts_on'] }}</time> – <time datetime="{{ $course->session['ends_on'] }}">{{ $course->session['ends_on'] }}</time></dd></div>
                     <div><dt>ศูนย์</dt><dd>{{ $course->session['center']['name'] }}</dd></div>
                     <div><dt>ที่อยู่</dt><dd>{{ $course->session['center']['address'] }}</dd></div>
-                    <div><dt>แผนที่</dt><dd><a rel="external noopener" href="{{ $course->session['center']['map_url'] }}">เปิดแผนที่ภายนอก<span class="sr-only"> (เปิดเว็บไซต์ภายนอก)</span></a></dd></div>
+                    <div><dt>แผนที่</dt><dd>
+                        @if ($course->session['center']['map_url'] !== null)
+                            <a rel="external noopener" href="{{ $course->session['center']['map_url'] }}">เปิดแผนที่ภายนอก<span class="sr-only"> (เปิดเว็บไซต์ภายนอก)</span></a>
+                        @else
+                            ไม่มีลิงก์แผนที่ที่ตรวจสอบแล้ว
+                        @endif
+                    </dd></div>
                 </dl>
             </div>
             <div class="detail-card">
@@ -55,7 +61,11 @@
                 @foreach ($course->session['capacity_rules'] as $rule)
                     <div class="capacity-card">
                         <strong>{{ ['female' => 'หญิง', 'male' => 'ชาย', 'monastic' => 'บรรพชิต'][$rule['category']] ?? $rule['category'] }}</strong>
-                        <span>เหลือ {{ $rule['remaining'] }} จาก {{ $rule['capacity'] }} ที่นั่ง</span>
+                        @if ($rule['remaining'] >= 0)
+                            <span>เหลือ {{ $rule['remaining'] }} จาก {{ $rule['capacity'] }} ที่นั่ง</span>
+                        @else
+                            <span>ข้อมูลจำนวนที่นั่งไม่ถูกต้อง</span>
+                        @endif
                     </div>
                 @endforeach
             </div>
@@ -87,7 +97,8 @@
                 </div>
             @endif
 
-            <form method="get" action="{{ route('course-catalog.detail', $course->session['code']) }}">
+            <form method="post" action="{{ route('course-catalog.eligibility', $course->session['code']) }}">
+                @csrf
                 <div class="filter-grid">
                     <div>
                         <label for="age">อายุ</label>

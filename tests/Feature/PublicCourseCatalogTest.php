@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use Database\Seeders\CourseCatalogSeeder;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -67,60 +68,212 @@ final class PublicCourseCatalogTest extends TestCase
     {
         $this->travelTo('2026-07-29 12:00:00');
 
-        $this->get('/course/detail/D10-2026-08-TAPODA?age=30&category=female&applicant_type=trainee')
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
             ->assertOk()
             ->assertSee('preliminary-eligible');
 
-        $this->get('/course/detail/D10-2026-08-TAPODA?age=30&category=male&applicant_type=trainee')
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', [...$this->eligibleInput(), 'category' => 'male'])
             ->assertOk()
             ->assertSee('capacity')
             ->assertSee('ที่นั่งสำหรับประเภทผู้สมัครนี้เต็มแล้ว');
 
-        $this->get('/course/detail/D10-2026-08-TAPODA?age=18&category=female&applicant_type=trainee')
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', [...$this->eligibleInput(), 'age' => '18'])
             ->assertOk()
             ->assertSee('age')
             ->assertSee('อายุไม่อยู่ในช่วงที่หลักสูตรกำหนด');
 
-        $this->get('/course/detail/D10-2026-08-TAPODA?age=30&category=female&applicant_type=staff')
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', [...$this->eligibleInput(), 'applicant_type' => 'staff'])
             ->assertOk()
             ->assertSee('applicant-type')
             ->assertSee('ประเภทผู้สมัครไม่ตรงกับนโยบายของหลักสูตร');
 
-        DB::table('courses')->where('id', 'd10')->update([
+        DB::table('course_sessions')->where('code', 'D10-2026-08-TAPODA')->update([
             'approved_categories' => json_encode(['female', 'male'], JSON_THROW_ON_ERROR),
         ]);
+        DB::table('course_capacity_rules')
+            ->where('course_session_id', '10000000-0000-4000-8000-000000000001')
+            ->where('category', 'monastic')
+            ->delete();
 
-        $this->get('/course/detail/D10-2026-08-TAPODA?age=30&category=monastic&applicant_type=trainee')
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', [...$this->eligibleInput(), 'category' => 'monastic'])
             ->assertOk()
             ->assertSee('category')
             ->assertSee('ประเภทผู้สมัครไม่อยู่ในกลุ่มที่หลักสูตรรับสมัคร');
 
-        $this->get('/course/detail/STAFF-2026-09-BKK?age=30&category=female&applicant_type=staff')
+        $this->post('/course/detail/STAFF-2026-09-BKK/eligibility', [...$this->eligibleInput(), 'applicant_type' => 'staff'])
             ->assertOk()
             ->assertSee('invite-only');
 
-        $this->get('/course/detail/D10-2026-06-TAPODA?age=30&category=female&applicant_type=trainee')
+        $this->post('/course/detail/D10-2026-06-TAPODA/eligibility', $this->eligibleInput())
             ->assertOk()
             ->assertSee('registration-closed')
             ->assertSee('ปิดรับสมัครแล้ว');
     }
 
-    public function test_existing_application_state_is_actor_scoped_and_blocks_duplicate_application(): void
+    public function test_existing_application_state_uses_authenticated_person_ownership(): void
     {
         $this->travelTo('2026-07-29 12:00:00');
 
-        DB::table('course_application_facts')->insert([
+        $ownerPersonId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        DB::table('application_workflow_facts')->insert([
             'course_session_id' => '10000000-0000-4000-8000-000000000001',
-            'actor_id' => 'existing-applicant',
+            'person_id' => $ownerPersonId,
             'state' => 'submitted',
         ]);
 
         $this
-            ->withHeader('X-Tapoda-Test-Actor', 'existing-applicant')
-            ->get('/course/detail/D10-2026-08-TAPODA?age=30&category=female&applicant_type=trainee')
+            ->actingAs(new CourseApplicantAccount('ordinary-applicant', $ownerPersonId))
+            ->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
             ->assertOk()
             ->assertSee('existing-application')
             ->assertSee('มีใบสมัครสำหรับรอบนี้อยู่แล้ว');
+
+        $this
+            ->actingAs(new CourseApplicantAccount('other-applicant', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'))
+            ->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+            ->assertOk()
+            ->assertSee('eligible');
+
+        $this->app['auth']->forgetGuards();
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+            ->assertOk()
+            ->assertSee('preliminary-eligible');
+
+        $this
+            ->actingAs(new CourseApplicantAccount('administrator', $ownerPersonId, 'administrator'))
+            ->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+            ->assertOk()
+            ->assertSee('preliminary-eligible');
+    }
+
+    public function test_eligibility_post_keeps_sensitive_inputs_out_of_url_and_private_caches(): void
+    {
+        $this->travelTo('2026-07-29 12:00:00');
+
+        $response = $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+            ->assertOk()
+            ->assertHeader('Referrer-Policy', 'no-referrer');
+
+        self::assertStringContainsString('private', (string) $response->headers->get('Cache-Control'));
+        self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        self::assertNull($response->headers->get('Location'));
+    }
+
+    public function test_untrusted_catalog_content_and_links_remain_inert(): void
+    {
+        DB::table('courses')->where('id', 'd10')->update([
+            'title_th' => '</title><script>alert(1)</script>',
+            'summary_th' => '" onmouseover="alert(1)',
+        ]);
+        DB::table('centers')->where('id', 'tapoda')->update([
+            'map_url' => 'javascript:alert(1)',
+        ]);
+
+        $response = $this->get('/course/detail/D10-2026-08-TAPODA')
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertDontSee('</title><script>', false)
+            ->assertDontSee('href="javascript:', false)
+            ->assertSee('ไม่มีลิงก์แผนที่ที่ตรวจสอบแล้ว');
+
+        self::assertStringContainsString("default-src 'self'", (string) $response->headers->get('Content-Security-Policy'));
+
+        DB::table('centers')->where('id', 'tapoda')->update(['map_url' => '//evil.example/map']);
+        $this->get('/course/detail/D10-2026-08-TAPODA')
+            ->assertOk()
+            ->assertDontSee('href="//evil.example', false);
+    }
+
+    public function test_documents_port_exposes_only_approved_public_owned_projection(): void
+    {
+        $rows = [];
+        foreach ([
+            ['private-doc', 'เอกสารส่วนตัว', 'private', 'approved', 'active', hash('sha256', 'private'), null, '10000000-0000-4000-8000-000000000001'],
+            ['quarantined-doc', 'เอกสารกักกัน', 'public', 'approved', 'active', hash('sha256', 'quarantine'), 'malware', '10000000-0000-4000-8000-000000000001'],
+            ['missing-checksum', 'เอกสารไร้ checksum', 'public', 'approved', 'active', null, null, '10000000-0000-4000-8000-000000000001'],
+            ['retired-doc', 'เอกสารเลิกใช้', 'public', 'approved', 'retired', hash('sha256', 'retired'), null, '10000000-0000-4000-8000-000000000001'],
+            ['foreign-doc', 'เอกสารต่างรอบ', 'public', 'approved', 'active', hash('sha256', 'foreign'), null, '10000000-0000-4000-8000-000000000002'],
+        ] as [$key, $title, $visibility, $approval, $lifecycle, $checksum, $quarantine, $sessionId]) {
+            $rows[] = [
+                'course_session_id' => $sessionId,
+                'key' => $key,
+                'title_th' => $title,
+                'version' => 1,
+                'checksum' => $checksum,
+                'visibility' => $visibility,
+                'approval_state' => $approval,
+                'lifecycle_state' => $lifecycle,
+                'quarantine_reason' => $quarantine,
+                'disposition' => 'local-placeholder',
+            ];
+        }
+        DB::table('document_publication_projections')->insert($rows);
+
+        $this->get('/course/detail/D10-2026-08-TAPODA')
+            ->assertOk()
+            ->assertSee('คู่มือเตรียมตัวเข้าร่วมหลักสูตร')
+            ->assertDontSee('เอกสารส่วนตัว')
+            ->assertDontSee('เอกสารกักกัน')
+            ->assertDontSee('เอกสารไร้ checksum')
+            ->assertDontSee('เอกสารเลิกใช้')
+            ->assertDontSee('เอกสารต่างรอบ');
+
+        foreach (['private-doc', 'quarantined-doc', 'missing-checksum', 'retired-doc', 'foreign-doc'] as $key) {
+            $this->get("/documents/{$key}")->assertNotFound();
+        }
+    }
+
+    public function test_session_policy_is_versioned_per_session_and_invalid_source_is_quarantined(): void
+    {
+        $this->travelTo('2026-07-29 12:00:00');
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+            ->assertSee('preliminary-eligible');
+
+        $this->travelTo('2026-05-01 12:00:00');
+        $this->post('/course/detail/D10-2026-06-TAPODA/eligibility', $this->eligibleInput())
+            ->assertSee('age');
+
+        DB::table('course_sessions')->where('code', 'D10-2026-08-TAPODA')->update([
+            'minimum_age' => 80,
+            'maximum_age' => 20,
+        ]);
+        DB::table('course_capacity_rules')
+            ->where('course_session_id', '10000000-0000-4000-8000-000000000001')
+            ->where('category', 'female')
+            ->update(['reserved_count' => 31]);
+
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+            ->assertOk()
+            ->assertSee('invalid-source-state')
+            ->assertSee('ข้อมูลจำนวนที่นั่งไม่ถูกต้อง')
+            ->assertDontSee('เหลือ 0 จาก 30');
+    }
+
+    public function test_registration_window_respects_exact_timezone_boundary(): void
+    {
+        $this->travelTo('2026-08-05 16:59:59 UTC');
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+            ->assertSee('preliminary-eligible');
+
+        $this->travelTo('2026-08-05 17:00:00 UTC');
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+            ->assertSee('registration-closed');
+    }
+
+    public function test_unknown_policy_values_and_inverted_window_are_rejected(): void
+    {
+        $this->travelTo('2026-07-29 12:00:00');
+
+        DB::table('course_sessions')->where('code', 'D10-2026-08-TAPODA')->update([
+            'applicant_type' => 'superuser',
+            'approved_categories' => json_encode(['alien'], JSON_THROW_ON_ERROR),
+            'registration_opens_at' => '2026-08-06 00:00:00+07',
+            'registration_closes_at' => '2026-08-05 00:00:00+07',
+        ]);
+
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+            ->assertOk()
+            ->assertSee('invalid-source-state');
     }
 
     public function test_public_content_and_document_compatibility_urls_have_safe_outcomes(): void
@@ -140,4 +293,21 @@ final class PublicCourseCatalogTest extends TestCase
             (string) $response->headers->get('Cache-Control'),
         );
     }
+
+    /**
+     * @return array{age: string, category: string, applicant_type: string}
+     */
+    private function eligibleInput(): array
+    {
+        return ['age' => '30', 'category' => 'female', 'applicant_type' => 'trainee'];
+    }
+}
+
+final class CourseApplicantAccount extends Authenticatable
+{
+    public function __construct(
+        public string $id,
+        public ?string $person_id,
+        public string $identity_type = 'applicant',
+    ) {}
 }

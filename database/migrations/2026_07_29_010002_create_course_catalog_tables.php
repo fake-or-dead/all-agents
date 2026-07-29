@@ -31,10 +31,6 @@ return new class extends Migration
             $table->string('course_type_id', 32);
             $table->string('title_th');
             $table->text('summary_th');
-            $table->unsignedSmallInteger('minimum_age')->nullable();
-            $table->unsignedSmallInteger('maximum_age')->nullable();
-            $table->string('applicant_type', 32)->default('trainee');
-            $table->json('approved_categories');
             $table->foreign('course_type_id')->references('id')->on('course_types');
         });
 
@@ -47,6 +43,12 @@ return new class extends Migration
             $table->date('ends_on');
             $table->timestampTz('registration_opens_at');
             $table->timestampTz('registration_closes_at');
+            $table->string('policy_version', 32);
+            $table->string('timezone', 64)->default('Asia/Bangkok');
+            $table->unsignedSmallInteger('minimum_age')->nullable();
+            $table->unsignedSmallInteger('maximum_age')->nullable();
+            $table->string('applicant_type', 32);
+            $table->json('approved_categories');
             $table->boolean('invite_only')->default(false);
             $table->boolean('published')->default(false);
             $table->foreign('course_id')->references('id')->on('courses');
@@ -79,31 +81,10 @@ return new class extends Migration
             $table->foreign('course_session_id')->references('id')->on('course_sessions')->cascadeOnDelete();
         });
 
-        Schema::create('course_documents', function (Blueprint $table): void {
-            $table->id();
-            $table->uuid('course_session_id');
-            $table->string('key', 64);
-            $table->string('title_th');
-            $table->string('compatibility_path')->unique();
-            $table->string('disposition', 32)->default('local-placeholder');
-            $table->unique(['course_session_id', 'key']);
-            $table->foreign('course_session_id')->references('id')->on('course_sessions')->cascadeOnDelete();
-        });
-
-        Schema::create('course_application_facts', function (Blueprint $table): void {
-            $table->id();
-            $table->uuid('course_session_id');
-            $table->string('actor_id', 128);
-            $table->string('state', 32);
-            $table->unique(['course_session_id', 'actor_id']);
-            $table->foreign('course_session_id')->references('id')->on('course_sessions')->cascadeOnDelete();
-        });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('course_application_facts');
-        Schema::dropIfExists('course_documents');
         Schema::dropIfExists('course_capacity_rules');
         Schema::dropIfExists('course_session_teachers');
         Schema::dropIfExists('teachers');

@@ -4,8 +4,8 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="color-scheme" content="light">
-        <meta name="description" content="@yield('description', 'ค้นหาและตรวจสอบหลักสูตรปฏิบัติธรรมตโปทาราม')">
-        <title>@yield('title', 'หลักสูตรตโปทาราม')</title>
+        <meta name="description" content="{{ $__env->yieldContent('description', 'ค้นหาและตรวจสอบหลักสูตรปฏิบัติธรรมตโปทาราม') }}">
+        <title>{{ $__env->yieldContent('title', 'หลักสูตรตโปทาราม') }}</title>
         @vite(['resources/css/app.css'])
     </head>
     <body>
