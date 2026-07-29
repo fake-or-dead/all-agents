@@ -5,10 +5,14 @@ namespace App\Providers;
 use App\Integrations\IdentityAccess\AuditSecurityEventRecorder;
 use App\Modules\DocumentsConsent\Contracts\ConsentAcceptanceService;
 use App\Modules\DocumentsConsent\Infrastructure\DatabaseConsentAcceptanceService;
+use App\Modules\IdentityAccess\Contracts\ApplicantIdentityResolver;
+use App\Modules\IdentityAccess\Contracts\ApplicantOwnershipDirectory;
 use App\Modules\IdentityAccess\Contracts\LocalVerificationMailbox;
 use App\Modules\IdentityAccess\Contracts\SecurityEventRecorder;
 use App\Modules\IdentityAccess\Contracts\VerificationGateway;
+use App\Modules\IdentityAccess\Infrastructure\DatabaseApplicantOwnershipDirectory;
 use App\Modules\IdentityAccess\Infrastructure\IdentitySecurityConfiguration;
+use App\Modules\IdentityAccess\Infrastructure\LaravelApplicantIdentityResolver;
 use App\Modules\IdentityAccess\Infrastructure\Verification\DeterministicFakeVerificationGateway;
 use App\Modules\People\Contracts\PersonIdentityDirectory;
 use App\Modules\People\Infrastructure\DatabasePersonIdentityDirectory;
@@ -29,6 +33,11 @@ final class IdentityAccessServiceProvider extends ServiceProvider
 
     public function register(): void
     {
+        $this->app->bind(ApplicantIdentityResolver::class, LaravelApplicantIdentityResolver::class);
+        $this->app->bind(
+            ApplicantOwnershipDirectory::class,
+            DatabaseApplicantOwnershipDirectory::class,
+        );
         $this->app->bind(SecurityEventRecorder::class, AuditSecurityEventRecorder::class);
         $this->app->bind(
             ConsentAcceptanceService::class,

@@ -205,6 +205,252 @@ code {
     font-size: 0.9em;
 }
 
+.public-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.public-nav a,
+.breadcrumb a,
+.primary-link,
+.course-card h3 a,
+.fact-list a,
+.plain-list a {
+    color: var(--link-default);
+    text-decoration-thickness: 0.1em;
+    text-underline-offset: 0.16em;
+}
+
+.public-footer {
+    padding-block: var(--space-6);
+    border-top: 1px solid var(--border-default);
+    color: var(--text-muted);
+    background: var(--surface-default);
+}
+
+.public-footer p {
+    margin: 0;
+}
+
+.filter-panel,
+.detail-card,
+.detail-section,
+.eligibility-panel,
+.content-page {
+    padding: clamp(var(--space-4), 4vw, var(--space-8));
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-medium);
+    background: var(--surface-elevated);
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: var(--space-4);
+}
+
+.filter-grid > div {
+    min-width: 0;
+}
+
+.filter-panel label,
+.eligibility-panel label {
+    display: block;
+    margin-bottom: var(--space-2);
+    font-weight: 600;
+}
+
+.filter-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+}
+
+.secondary-action {
+    min-height: var(--size-touch);
+    padding: var(--space-2) var(--space-4);
+    color: var(--link-default);
+}
+
+.error-summary {
+    margin-bottom: var(--space-6);
+    padding: var(--space-4);
+    border: 2px solid var(--status-blocked);
+    border-radius: var(--radius-small);
+    background: var(--surface-default);
+}
+
+.error-summary h2,
+.error-summary h3 {
+    margin-top: 0;
+}
+
+.results,
+.detail-section,
+.eligibility-panel {
+    margin-top: var(--space-8);
+}
+
+.result-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4);
+}
+
+.course-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: var(--space-4);
+    margin: var(--space-4) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.course-card {
+    padding: var(--space-5);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-medium);
+    background: var(--surface-elevated);
+}
+
+.course-card h3 {
+    margin: var(--space-2) 0 var(--space-4);
+    font-size: 1.25rem;
+}
+
+.course-type,
+.document-note {
+    color: var(--text-muted);
+    font-size: var(--font-size-small);
+}
+
+.course-type {
+    margin: 0;
+}
+
+.fact-list {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+}
+
+.fact-list div {
+    display: grid;
+    grid-template-columns: minmax(5rem, 0.35fr) 1fr;
+    gap: var(--space-3);
+}
+
+.fact-list dt {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.fact-list dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.status-badge {
+    display: inline-block;
+    margin: var(--space-4) 0 0;
+    padding: var(--space-1) var(--space-3);
+    border-radius: 999px;
+    color: var(--status-waiting);
+    background: var(--surface-page);
+    font-weight: 600;
+}
+
+.empty-state {
+    margin-top: var(--space-4);
+    padding: var(--space-8);
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-medium);
+    text-align: center;
+}
+
+.empty-state h3 {
+    margin-top: 0;
+}
+
+.breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-6);
+    color: var(--text-muted);
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+    gap: var(--space-4);
+}
+
+.detail-card h2,
+.detail-section h2,
+.eligibility-panel h2 {
+    margin-bottom: var(--space-5);
+}
+
+.plain-list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.capacity-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+    gap: var(--space-3);
+}
+
+.capacity-card {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    border-radius: var(--radius-small);
+    background: var(--surface-page);
+}
+
+.eligibility-panel form {
+    margin-block: var(--space-5);
+}
+
+.eligibility-panel button {
+    margin-top: var(--space-4);
+}
+
+.eligibility-result {
+    padding: var(--space-4);
+    border-left: 0.25rem solid var(--status-waiting);
+    background: var(--surface-page);
+}
+
+.eligibility-result[data-status="eligible"] {
+    border-left-color: var(--status-ready);
+}
+
+.eligibility-result[data-status="unavailable"] {
+    border-left-color: var(--status-blocked);
+}
+
+.eligibility-result h3 {
+    margin-top: 0;
+}
+
+.content-page {
+    max-width: 48rem;
+}
+
 .sr-only {
     position: absolute;
     width: 1px;
@@ -230,6 +476,20 @@ code {
 
     button {
         width: 100%;
+    }
+
+    .public-nav {
+        gap: var(--space-2) var(--space-3);
+    }
+
+    .fact-list div {
+        grid-template-columns: 1fr;
+        gap: var(--space-1);
+    }
+
+    .result-heading {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }
 
