@@ -16,7 +16,7 @@ $ownedTables = [
         'consent_document_versions',
         'consent_acceptances',
     ],
-    'People' => ['people', 'person_identifiers'],
+    'People' => ['people', 'person_identifiers', 'person_account_link_proofs'],
 ];
 $violations = [];
 $discoveredModules = [];
@@ -88,6 +88,28 @@ foreach (new DirectoryIterator($moduleRoot) as $moduleDirectory) {
 foreach (array_keys($allowedImports) as $module) {
     if (! in_array($module, $discoveredModules, true)) {
         $violations[] = "{$module} architecture policy has no module directory";
+    }
+}
+
+$fixture = getenv('ARCHITECTURE_CHECK_FIXTURE');
+if (is_string($fixture) && $fixture !== '' && is_file($fixture)) {
+    $contents = file_get_contents($fixture);
+
+    foreach ($ownedTables as $owner => $tables) {
+        if ($owner === 'IdentityAccess') {
+            continue;
+        }
+
+        foreach ($tables as $table) {
+            if (
+                preg_match(
+                    "/(?:table|from|join)\\(\\s*['\"]".preg_quote($table, '/')."['\"]/",
+                    $contents,
+                ) === 1
+            ) {
+                $violations[] = "{$fixture} accesses {$owner}-owned table {$table}";
+            }
+        }
     }
 }
 

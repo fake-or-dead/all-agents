@@ -85,39 +85,45 @@ final readonly class PrivacySafeRateLimiter
             [$this->key($action, 'pair', "{$client}:{$identifier}"), $limits['pair']],
         ];
 
-        // Redis Cache::lock is an atomic distributed mutex. All three bucket
-        // checks and increments therefore observe one linearized request,
-        // rather than three stale reads followed by three independent writes.
-        // This is deliberately action-scoped, not pair-scoped: concurrent
-        // requests with a different identifier still share the client bucket,
-        // and requests from a different client still share the identifier
-        // bucket. One Redis mutex gives every overlapping bucket set a single
-        // serialization point without putting any PII in a key.
-        $lock = Cache::lock(
-            'identity-access:rate-lock:'.$this->keyVersion().':'.$action,
-            max(2, $limits['decay']),
+        // Each request locks its three privacy-safe buckets. Sorting the
+        // opaque lock names gives overlapping requests one global acquisition
+        // order, so they serialize without deadlocking; unrelated subjects
+        // share no lock and can continue independently.
+        $lockNames = array_map(
+            fn (array $bucket): string => 'identity-access:rate-lock:'.$this->keyVersion().':'.$this->pseudonym("lock:{$bucket[0]}"),
+            $keys,
         );
+        sort($lockNames, SORT_STRING);
+        $locks = [];
 
         try {
-            return $lock->block(2, function () use ($keys, $limits, $callback): bool {
-                foreach ($keys as [$key, $maximum]) {
-                    if (RateLimiter::tooManyAttempts($key, $maximum)) {
-                        return false;
-                    }
+            foreach ($lockNames as $lockName) {
+                $lock = Cache::lock($lockName, max(2, $limits['decay']));
+                $lock->block(2);
+                $locks[] = $lock;
+            }
+
+            foreach ($keys as [$key, $maximum]) {
+                if (RateLimiter::tooManyAttempts($key, $maximum)) {
+                    return false;
                 }
+            }
 
-                foreach ($keys as [$key]) {
-                    RateLimiter::hit($key, $limits['decay']);
-                }
+            foreach ($keys as [$key]) {
+                RateLimiter::hit($key, $limits['decay']);
+            }
 
-                $callback();
+            $callback();
 
-                return true;
-            });
+            return true;
         } catch (LockTimeoutException) {
             // A contended abuse-control request fails closed and keeps the
             // public response neutral in its controller.
             return false;
+        } finally {
+            foreach (array_reverse($locks) as $lock) {
+                $lock->release();
+            }
         }
     }
 

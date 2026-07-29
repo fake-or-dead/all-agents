@@ -6,6 +6,8 @@ $rateLimitVersion = (string) env('IDENTITY_RATE_LIMIT_KEY_VERSION', 'v1');
 
 return [
     'account_lookup_key_version' => $accountLookupVersion,
+    'account_lookup_previous_version' => $accountLookupPreviousVersion,
+    'account_lookup_previous_key' => env('IDENTITY_ACCOUNT_LOOKUP_PREVIOUS_KEY'),
     'account_lookup_keys' => array_filter([
         $accountLookupVersion => env('IDENTITY_ACCOUNT_LOOKUP_KEY'),
         $accountLookupPreviousVersion => env('IDENTITY_ACCOUNT_LOOKUP_PREVIOUS_KEY'),

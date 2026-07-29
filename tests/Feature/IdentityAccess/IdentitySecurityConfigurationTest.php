@@ -71,6 +71,27 @@ final class IdentitySecurityConfigurationTest extends TestCase
         $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
     }
 
+    public function test_people_lookup_rejects_equal_current_and_previous_versions_with_different_keys(): void
+    {
+        config()->set('people.identifier_lookup_previous_version', 'v1');
+        config()->set('people.identifier_lookup_previous_key', str_repeat('p', 32));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('people lookup current and previous key versions must differ');
+        $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
+    }
+
+    public function test_account_lookup_rejects_equal_current_and_previous_versions_with_the_same_key(): void
+    {
+        $key = (string) config('identity-access.account_lookup_keys.v1');
+        config()->set('identity-access.account_lookup_previous_version', 'v1');
+        config()->set('identity-access.account_lookup_previous_key', $key);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('account lookup current and previous key versions must differ');
+        $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
+    }
+
     public function test_boot_validation_rejects_an_unreviewed_bcrypt_round_before_serving_requests(): void
     {
         config()->set('hashing.bcrypt.rounds', 11);

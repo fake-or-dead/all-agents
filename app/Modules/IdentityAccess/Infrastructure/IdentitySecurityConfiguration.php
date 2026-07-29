@@ -27,6 +27,17 @@ final readonly class IdentitySecurityConfiguration
             );
         }
 
+        $this->assertCurrentAndPreviousVersionsDiffer(
+            'people lookup',
+            'people.identifier_lookup_key_version',
+            'people.identifier_lookup_previous_version',
+        );
+        $this->assertCurrentAndPreviousVersionsDiffer(
+            'account lookup',
+            'identity-access.account_lookup_key_version',
+            'identity-access.account_lookup_previous_version',
+        );
+
         $keySets = [
             'people lookup' => $this->keys(
                 'people.identifier_lookup_key_version',
@@ -89,6 +100,19 @@ final readonly class IdentitySecurityConfiguration
         }
 
         return $keys;
+    }
+
+    private function assertCurrentAndPreviousVersionsDiffer(
+        string $name,
+        string $currentVersionPath,
+        string $previousVersionPath,
+    ): void {
+        $current = $this->config->get($currentVersionPath);
+        $previous = $this->config->get($previousVersionPath);
+
+        if (is_string($current) && $current !== '' && $previous === $current) {
+            throw new RuntimeException("{$name} current and previous key versions must differ.");
+        }
     }
 
     private function assertSupportedBcryptCosts(): void

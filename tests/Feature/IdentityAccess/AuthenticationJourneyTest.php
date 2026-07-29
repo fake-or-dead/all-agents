@@ -254,6 +254,80 @@ final class AuthenticationJourneyTest extends TestCase
         DB::table('audit_events')->truncate();
     }
 
+    #[Group('service-integration')]
+    public function test_real_redis_unrelated_buckets_do_not_serialize_slow_callbacks(): void
+    {
+        $this->requireRealRedisConcurrencySupport();
+
+        config()->set('cache.default', 'redis');
+        Cache::clearResolvedInstance('cache');
+        RateLimiter::clearResolvedInstance('cache.rateLimiter');
+        Cache::clear();
+        $resultFile = tempnam(sys_get_temp_dir(), 'tapoda-rate-unrelated-');
+        self::assertNotFalse($resultFile);
+
+        $slowPid = pcntl_fork();
+        self::assertNotSame(-1, $slowPid);
+
+        if ($slowPid === 0) {
+            $this->resetForkedRateLimiter();
+            $accepted = $this->app->make(PrivacySafeRateLimiter::class)->attemptIdentity(
+                'parallel-unrelated',
+                '198.51.100.201',
+                IdentityClaim::fromInput('passport', 'SLOW000001'),
+                ['client' => 10, 'identifier' => 10, 'pair' => 10, 'decay' => 60],
+                static function () use ($resultFile): bool {
+                    file_put_contents($resultFile, "slow-start\n", FILE_APPEND | LOCK_EX);
+                    sleep(2);
+                    file_put_contents($resultFile, "slow-end\n", FILE_APPEND | LOCK_EX);
+
+                    return true;
+                },
+            );
+            file_put_contents($resultFile, $accepted ? "slow-accepted\n" : "slow-denied\n", FILE_APPEND | LOCK_EX);
+            posix_kill(posix_getpid(), SIGKILL);
+        }
+
+        $this->waitForRateResult($resultFile, 'slow-start');
+        $fastPid = pcntl_fork();
+        self::assertNotSame(-1, $fastPid);
+
+        if ($fastPid === 0) {
+            $this->resetForkedRateLimiter();
+            $accepted = $this->app->make(PrivacySafeRateLimiter::class)->attemptIdentity(
+                'parallel-unrelated',
+                '198.51.100.202',
+                IdentityClaim::fromInput('passport', 'FAST000001'),
+                ['client' => 10, 'identifier' => 10, 'pair' => 10, 'decay' => 60],
+                static function () use ($resultFile): bool {
+                    file_put_contents($resultFile, "fast-callback\n", FILE_APPEND | LOCK_EX);
+
+                    return true;
+                },
+            );
+            file_put_contents($resultFile, $accepted ? "fast-accepted\n" : "fast-denied\n", FILE_APPEND | LOCK_EX);
+            posix_kill(posix_getpid(), SIGKILL);
+        }
+
+        foreach ([$slowPid, $fastPid] as $pid) {
+            pcntl_waitpid($pid, $status);
+            self::assertTrue(pcntl_wifsignaled($status));
+        }
+
+        $results = file($resultFile, FILE_IGNORE_NEW_LINES);
+        self::assertIsArray($results);
+        self::assertContains('fast-accepted', $results);
+        self::assertLessThan(
+            array_search('slow-end', $results, true),
+            array_search('fast-callback', $results, true),
+        );
+        @unlink($resultFile);
+        Cache::clear();
+        config()->set('cache.default', 'array');
+        Cache::clearResolvedInstance('cache');
+        RateLimiter::clearResolvedInstance('cache.rateLimiter');
+    }
+
     private function requireRealRedisConcurrencySupport(): void
     {
         if (! function_exists('pcntl_fork') || ! function_exists('posix_kill')) {
@@ -268,6 +342,29 @@ final class AuthenticationJourneyTest extends TestCase
         } catch (\Throwable) {
             $this->skipOrFailRealServiceProof('Redis is unavailable for the real-Redis concurrency check.');
         }
+    }
+
+    private function resetForkedRateLimiter(): void
+    {
+        Cache::clearResolvedInstance('cache');
+        RateLimiter::clearResolvedInstance('cache.rateLimiter');
+        $this->app->forgetInstance('cache');
+        $this->app->forgetInstance('cache.rateLimiter');
+    }
+
+    private function waitForRateResult(string $resultFile, string $expected): void
+    {
+        foreach (range(1, 100) as $attempt) {
+            $results = file($resultFile, FILE_IGNORE_NEW_LINES) ?: [];
+
+            if (in_array($expected, $results, true)) {
+                return;
+            }
+
+            usleep(20_000);
+        }
+
+        self::fail("Timed out waiting for {$expected}.");
     }
 
     private function skipOrFailRealServiceProof(string $reason): never
