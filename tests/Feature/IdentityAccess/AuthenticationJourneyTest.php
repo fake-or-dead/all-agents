@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 final class AuthenticationJourneyTest extends TestCase
@@ -187,11 +188,10 @@ final class AuthenticationJourneyTest extends TestCase
             ])->assertTooManyRequests();
     }
 
+    #[Group('service-integration')]
     public function test_real_redis_parallel_requests_cannot_overrun_an_overlapping_client_bucket(): void
     {
-        if (! function_exists('pcntl_fork') || ! function_exists('posix_kill')) {
-            self::markTestSkipped('pcntl is required for the real-Redis concurrency check.');
-        }
+        $this->requireRealRedisConcurrencySupport();
 
         // phpunit defaults to array cache; deliberately switch this one test
         // to the Compose Redis service so process isolation is real.
@@ -252,6 +252,31 @@ final class AuthenticationJourneyTest extends TestCase
         Cache::clearResolvedInstance('cache');
         RateLimiter::clearResolvedInstance('cache.rateLimiter');
         DB::table('audit_events')->truncate();
+    }
+
+    private function requireRealRedisConcurrencySupport(): void
+    {
+        if (! function_exists('pcntl_fork') || ! function_exists('posix_kill')) {
+            $this->skipOrFailRealServiceProof('pcntl and posix are required for the real-Redis concurrency check.');
+        }
+
+        $probeKey = 'tapoda-real-redis-probe-'.Str::uuid();
+
+        try {
+            Cache::store('redis')->put($probeKey, '1', 5);
+            Cache::store('redis')->forget($probeKey);
+        } catch (\Throwable) {
+            $this->skipOrFailRealServiceProof('Redis is unavailable for the real-Redis concurrency check.');
+        }
+    }
+
+    private function skipOrFailRealServiceProof(string $reason): never
+    {
+        if (getenv('REQUIRE_REAL_SERVICES') === '1') {
+            self::fail("REQUIRE_REAL_SERVICES=1: {$reason}");
+        }
+
+        self::markTestSkipped($reason);
     }
 
     public function test_sign_in_validation_is_thai_and_does_not_query_malformed_identity(): void

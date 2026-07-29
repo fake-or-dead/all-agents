@@ -10,6 +10,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -97,9 +98,16 @@ final class RegistrationJourneyTest extends TestCase
         $this->assertStringNotContainsString('owner@example.test', mb_strtolower($databaseText));
     }
 
+    #[Group('service-integration')]
     public function test_recovery_epoch_bump_rejects_a_delayed_registration_session_on_postgres(): void
     {
-        $this->assertSame('pgsql', DB::connection()->getDriverName());
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            if (getenv('REQUIRE_REAL_SERVICES') === '1') {
+                self::fail('REQUIRE_REAL_SERVICES=1 requires PostgreSQL for the registration session epoch proof.');
+            }
+
+            self::markTestSkipped('The registration session epoch proof is PostgreSQL-specific.');
+        }
         $email = 'delayed-session@example.test';
         $registrationToken = $this->verifiedRegistrationToken($email);
         $workflow = $this->app->make(IdentityAccessWorkflow::class);

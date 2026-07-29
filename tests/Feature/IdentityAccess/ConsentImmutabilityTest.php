@@ -5,17 +5,17 @@ namespace Tests\Feature\IdentityAccess;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('service-integration')]
 final class ConsentImmutabilityTest extends TestCase
 {
     use RefreshDatabase;
 
     public function test_postgresql_rejects_updating_published_consent(): void
     {
-        if (DB::getDriverName() !== 'pgsql') {
-            self::markTestSkipped('Immutable consent guards are PostgreSQL-specific.');
-        }
+        $this->requirePostgres();
 
         $this->expectException(QueryException::class);
         DB::table('consent_document_versions')
@@ -81,6 +81,10 @@ final class ConsentImmutabilityTest extends TestCase
     private function requirePostgres(): void
     {
         if (DB::getDriverName() !== 'pgsql') {
+            if (getenv('REQUIRE_REAL_SERVICES') === '1') {
+                self::fail('REQUIRE_REAL_SERVICES=1 requires PostgreSQL for immutable consent proofs.');
+            }
+
             self::markTestSkipped('Immutable consent guards are PostgreSQL-specific.');
         }
     }
