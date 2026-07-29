@@ -257,28 +257,11 @@ code {
     min-width: 0;
 }
 
-label {
+.filter-panel label,
+.eligibility-panel label {
     display: block;
     margin-bottom: var(--space-2);
     font-weight: 600;
-}
-
-input,
-select {
-    width: 100%;
-    min-height: var(--size-touch);
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-small);
-    color: var(--text-default);
-    background: var(--surface-default);
-    font: inherit;
-}
-
-input:focus-visible,
-select:focus-visible {
-    outline: 0.1875rem solid var(--focus-ring);
-    outline-offset: 0.125rem;
 }
 
 .filter-actions {
@@ -571,6 +554,24 @@ select:focus-visible {
 
 .verification-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+input,
+select {
+    width: 100%;
+    min-height: var(--size-touch);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-small);
+    color: var(--text-default);
+    background: var(--surface-default);
+    font: inherit;
+}
+
+input:focus-visible,
+select:focus-visible {
+    outline: 0.1875rem solid var(--focus-ring);
+    outline-offset: 0.125rem;
 }
 
 .check-field {
