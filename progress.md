@@ -12,7 +12,8 @@ GitHub Issues remain the task-level source of truth.
   a verified Docker application at `http://localhost:8080`.
 - Explicit exclusions: production approvals, production writes, cutover, and
   destructive legacy retirement.
-- Scope tracker: 12 closed / 20 open.
+- Scope tracker: 11 complete / 21 open. Issue #12 is merged and closed in
+  GitHub, but remains release-pending under the localhost Definition of Done.
 - Default-branch release: PR #43 merged at
   `b3ff3825e289d40b0d202d077c7332d2255cc175`; reviewed head `dda4177`,
   duplicate exact-SHA CI runs both passed 4/4, and dual reciprocal approval is
@@ -70,7 +71,7 @@ and the authenticated `GET /account` returned HTTP 200.
 
 | Workstream | Owner | Status | Blocker | Next checkpoint |
 | --- | --- | --- | --- | --- |
-| Release control | PM/controller | PR #43 merged at `b3ff382`; exact release live on `:8080` | None | Publish runtime evidence through PR #45 |
+| Release control | PM/controller | PR #43 merged at `b3ff382`; exact release live on `:8080`; PR #45 already merged at `3444bfd` | Member Center integration awaits release | Merge PR #49, then open the small integration-to-main release PR |
 | PM operating system | PM/controller | Delivered and active | None | Refresh dashboard at every phase boundary |
 | Course Catalog | coding + dual review agents complete | Released to `main`/`:8080`; URLs verified above | None | Keep regression gates |
 | Local seed | coding/review agents complete | Released to `main`/`:8080`; real seeded sign-in verified | None | Keep local-only guard |
@@ -82,8 +83,9 @@ and the authenticated `GET /account` returned HTTP 200.
 
 ## Delivery metrics
 
-- Current scope progress: 12/32 scopes closed; Member Center is integrated and
-  waiting for the next small `main` release.
+- Current scope progress: 11/32 scopes complete. Issue #12 is integrated and
+  its tracker is closed, but it becomes scope 12/32 only after the next small
+  `main` release and verified `localhost:8080` rebuild.
 - Naive scope velocity is misleading because #1–#8 are decision gates and later
   lifecycle, migration, report, and staff scopes are larger.
 - Current forecast for local completion: 96–120 continuous hours at the
