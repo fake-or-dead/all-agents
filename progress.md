@@ -57,7 +57,7 @@ until the next `main` release and `localhost:8080` rebuild.
 | 2 | PM operating system | Delivered | PR #40 merge `9749eaec`, reviewed `daf9cd9`, CI 4/4, dual reciprocal PASS | Keep dashboard authoritative |
 | 3 | Course Catalog canonical ownership | Delivered to integration; Issue #10 closed | PR #34 merge `e675535`, reviewed `0eb7fe2`, CI `30431450234` 4/4, Browser 26/26, dual reciprocal PASS | Include in next `main` release and rebuild `:8080` |
 | 4 | Deterministic PHPStan memory gate | Delivered to integration | PR #38 merge `762ff4c`, reviewed `c62ae43`, CI 4/4, dual reciprocal PASS | Include in next `main` release |
-| 5 | Safe canonical local seed | Local review fix complete | Issue #36, `8ee0b78`, full gates and seeded runtime pass | Push, PR, CI, dual review |
+| 5 | Safe canonical local seed | Rebased candidate under fresh local verification | Issue #36; exact SHA remains unpublished until current gates pass | Push exact candidate, PR, CI, dual review |
 | 6 | Profile/application security | Not started | Issue #12 | Start after #34 schema lands |
 
 ## Active workstreams
