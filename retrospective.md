@@ -109,3 +109,15 @@ Every active delivery hour records:
 - Parallel preparation: PR #34 was inspected read-only against incoming PR #35. Actual conflict markers are limited to `app/Models/Account.php`, `bootstrap/providers.php`, `docker/frankenphp/Caddyfile`, and `tools/architecture-check.php`; `compose.yaml` and `resources/css/app.css` auto-merge but require semantic review.
 - Delivery result: the previous target was not met because exact-SHA review correctly found a new rotation blocker. The blocker is fixed and reviewed locally, but PR #35 is not yet merged and `localhost:8080` remains on the older build.
 - Next-hour target: finish CI and fresh dual remote approval for `3a55025`, merge PR #35, rebase and remediate PR #34 using canonical Account/People ownership, then rebuild and verify `localhost:8080`.
+
+### 2026-07-29 13:07 +07
+
+- Output: PR #35 Account merged into integration at `71bf9af`; Issue #11 closed. PR #39 delivered Foundation + Account to `main` at merge `8169f11` and removed all tracked `.scratch/tapoda-rebuild/`. PR #40 delivered the PM operating system at merge `9749eaec` after CI 4/4 and dual reciprocal xhigh approval.
+- Visible runtime: `localhost:8080` was rebuilt from exact `main` merge `9749eaec` as image `sha256:a0de2d18c138cb560aa2ef111aaa71652df7befc2adc1ffc47feb28362b2b8ca`. Non-destructive Identity & Access migration, exact artifact assertions for web/worker/scheduler, readiness, smoke, and the user URL matrix passed. No seed was run and the PostgreSQL volume was preserved.
+- Bottleneck: PR #34 Course Catalog is locally complete but GitHub browser job `90492189747` failed two integrated Linux snapshots: Auth signup 5% and catalog 1%. Backend, frontend, and secret gates passed.
+- Loop found: isolated Course Catalog browser tests passed 10/10 but did not include the integrated 26-test browser suite. The candidate reached GitHub before whole-stack visual parity was proven.
+- Change applied: every final candidate must run the complete integrated browser suite against the exact candidate runtime before push and review. Feature-only browser suites remain fast feedback, not release evidence.
+- PM problem found: `progress.md` became stale immediately after PR #40 merged and did not contain a concrete user URL matrix or seed-account status.
+- Change applied: runtime rebuild now ends with exact artifact assertion, smoke, per-URL HTTP checks, and a dashboard update containing check URLs, expected behavior, and seed credentials or an explicit no-seed statement.
+- Seed problem: `main` still references removed `App\Models\User` in `DatabaseSeeder`. Issue #36 fixes canonical local seed behavior and guards it to local/testing plus the deterministic fake adapter, but it remains unpushed until PR #34 lands to avoid shared-file conflict.
+- Next-hour target: diagnose both PR #34 image diffs, pass the full integrated browser suite, push a replacement SHA, obtain exact-SHA dual review, and merge the next small release.
