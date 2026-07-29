@@ -1,6 +1,6 @@
 # Delivery Progress
 
-Last updated: 2026-07-29 14:12 +07
+Last updated: 2026-07-29 14:36 +07
 
 Owner: PM/controller. This is the presentation-ready delivery dashboard. Update
 at each merge, blocker, replacement SHA, runtime change, and hourly checkpoint.
@@ -12,7 +12,7 @@ GitHub Issues remain the task-level source of truth.
   a verified Docker application at `http://localhost:8080`.
 - Explicit exclusions: production approvals, production writes, cutover, and
   destructive legacy retirement.
-- Scope tracker: 10 closed / 22 open.
+- Scope tracker: 11 closed / 21 open.
 - Default-branch release: PR #40 merged at
   `9749eaec91e154584366bc64261e9fb3d2c6d5e2`; reviewed head `daf9cd9`, CI
   4/4, dual reciprocal approval complete. It follows PR #39, which delivered
@@ -34,12 +34,20 @@ GitHub Issues remain the task-level source of truth.
 | `http://localhost:8080/health/live` | Process liveness JSON | HTTP 200 |
 | `http://localhost:8080/health/ready` | PostgreSQL, Redis, worker, and scheduler readiness JSON | HTTP 200 |
 
-There is no supported seeded account on this release. The current `main`
-seeder still references removed `App\Models\User`; do not run it. Create an
-account through `/signup`. Issue #36 contains the guarded canonical local seed
-candidate and will publish its user/password here after PR #34 is integrated.
-Course Catalog URLs are not listed as delivered until PR #34 passes integrated
-browser CI, dual review, merge, and the `localhost:8080` rebuild.
+There is no supported seeded account on the currently running `main` release.
+The current `main` seeder still references removed `App\Models\User`; do not run
+it. Create an account through `/signup`.
+
+Issue #36 reserves this local-only candidate account:
+
+- Sign-in ID: `1234567890123`
+- Password: `TapodaLocalSeed!2026`
+- Recovery email: `local-seed-account@tapoda.test`
+
+These credentials are not usable on `localhost:8080` until Issue #36 passes
+rebase, fresh seed/sign-in verification, PR review, merge, and runtime rebuild.
+Course Catalog is merged to integration but its URLs are not listed as live
+until the next `main` release and `localhost:8080` rebuild.
 
 ## Release train
 
@@ -47,7 +55,7 @@ browser CI, dual review, merge, and the `localhost:8080` rebuild.
 | --- | --- | --- | --- | --- |
 | 1 | Foundation + Account to `main`; remove `.scratch/tapoda-rebuild/` | Delivered | PR #39 merge `8169f11`, reviewed `71bf9af`, CI 4/4, dual reciprocal PASS | Keep as release baseline |
 | 2 | PM operating system | Delivered | PR #40 merge `9749eaec`, reviewed `daf9cd9`, CI 4/4, dual reciprocal PASS | Keep dashboard authoritative |
-| 3 | Course Catalog canonical ownership | Replacement CI 25/26; visual + architecture review fixes in progress | PR #34 `d77ab7b`; native baseline must use inspected `b816107d`; security comment `5114347287` proves direct owned-table reads bypass the checker | Fix owned-table gate/negative diagnostics, sync native baseline, rerun full gates |
+| 3 | Course Catalog canonical ownership | Delivered to integration; Issue #10 closed | PR #34 merge `e675535`, reviewed `0eb7fe2`, CI `30431450234` 4/4, Browser 26/26, dual reciprocal PASS | Include in next `main` release and rebuild `:8080` |
 | 4 | Deterministic PHPStan memory gate | Delivered to integration | PR #38 merge `762ff4c`, reviewed `c62ae43`, CI 4/4, dual reciprocal PASS | Include in next `main` release |
 | 5 | Safe canonical local seed | Local review fix complete | Issue #36, `8ee0b78`, full gates and seeded runtime pass | Push, PR, CI, dual review |
 | 6 | Profile/application security | Not started | Issue #12 | Start after #34 schema lands |
@@ -58,10 +66,10 @@ browser CI, dual review, merge, and the `localhost:8080` rebuild.
 | --- | --- | --- | --- | --- |
 | Release control | PM/controller | PR #39 and PR #40 merged to `main`; exact release live on `:8080` | None | Release Course Catalog when green |
 | PM operating system | PM/controller | Delivered and active | None | Refresh dashboard at every phase boundary |
-| Course Catalog | coding + dual review agents | Auth CSS/clock fixes pass; CI 25/26; new Medium posted | Native baseline provenance and incomplete owned-table architecture rules | One replacement SHA, fresh CI/reviews |
-| Local seed | coding agent | Security guard fixed; local gates pass | PR not created | Publish issue #36 branch |
+| Course Catalog | coding + dual review agents complete | PR #34 merged at `e675535`; Issue #10 closed | Not yet released to `main`/`:8080` | Ship next small release |
+| Local seed | coding agent | Rebase/test from PR #34 integration is active; guarded credentials documented above | PR not created | Fresh PostgreSQL seed/sign-in proof, then publish Issue #36 branch |
 | PHPStan gate | coding/review agents complete | PR #38 merged at `762ff4c`; Issue #37 closed | None | Ship with next release |
-| Issue #12 member center | unassigned | Implementation task packet posted at Issue comment `5114102073` | Start condition is PR #34 merge | Branch from resulting integration SHA |
+| Issue #12 member center | queued coding agent | Implementation task packet posted at Issue comment `5114102073` | Start condition satisfied by PR #34 merge | Branch from integration `e675535` after release branch isolation |
 
 ## Delivery metrics
 
