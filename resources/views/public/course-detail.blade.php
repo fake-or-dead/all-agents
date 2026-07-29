@@ -36,8 +36,8 @@
             <div class="detail-card">
                 <h2>นโยบายการรับสมัคร</h2>
                 <dl class="fact-list">
-                    <div><dt>เปิดรับ</dt><dd><time datetime="{{ $course->session['registration_opens_at'] }}">{{ $displayDates['registration_opens_at'] }}</time></dd></div>
-                    <div><dt>ปิดรับ</dt><dd><time datetime="{{ $course->session['registration_closes_at'] }}">{{ $displayDates['registration_closes_at'] }}</time></dd></div>
+                    <div><dt>เปิดรับ</dt><dd><time @if ($machineDates['registration_opens_at'] !== null) datetime="{{ $machineDates['registration_opens_at'] }}" @endif>{{ $displayDates['registration_opens_at'] }}</time></dd></div>
+                    <div><dt>ปิดรับ</dt><dd><time @if ($machineDates['registration_closes_at'] !== null) datetime="{{ $machineDates['registration_closes_at'] }}" @endif>{{ $displayDates['registration_closes_at'] }}</time></dd></div>
                     <div><dt>อายุ</dt><dd>{{ $course->session['minimum_age'] ?? 'ไม่กำหนด' }}–{{ $course->session['maximum_age'] ?? 'ไม่กำหนด' }} ปี</dd></div>
                     <div><dt>ประเภทผู้สมัคร</dt><dd>{{ $course->session['applicant_type'] === 'trainee' ? 'ผู้เข้าอบรม' : 'ผู้สมัครเจ้าหน้าที่' }}</dd></div>
                 </dl>

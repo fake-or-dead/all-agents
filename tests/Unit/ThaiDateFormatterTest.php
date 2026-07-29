@@ -22,6 +22,15 @@ final class ThaiDateFormatterTest extends TestCase
             $formatter->dateTime('2026-08-05 16:59:59+00', 'Asia/Bangkok'),
         );
         self::assertSame(
+            '2026-07-01T00:00:00+07:00',
+            $formatter->dateTimeAttribute('2026-06-30 17:00:00+00', 'Asia/Bangkok'),
+        );
+        self::assertSame(
+            '2026-08-05T23:59:59+07:00',
+            $formatter->dateTimeAttribute('2026-08-05 16:59:59+00', 'Asia/Bangkok'),
+        );
+        self::assertNull($formatter->dateTimeAttribute('not-a-date', 'Asia/Bangkok'));
+        self::assertSame(
             '10 สิงหาคม 2569',
             $formatter->date('2026-08-10', 'Asia/Bangkok'),
         );

@@ -53,6 +53,19 @@ final class ThaiDateFormatter
         );
     }
 
+    public function dateTimeAttribute(string $value, string $timezone): ?string
+    {
+        try {
+            $zone = new DateTimeZone($timezone);
+
+            return CarbonImmutable::parse($value)
+                ->setTimezone($zone)
+                ->toIso8601String();
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
     public function buddhistYear(int $gregorianYear): int
     {
         return $gregorianYear + 543;
