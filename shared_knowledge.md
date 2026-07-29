@@ -150,6 +150,12 @@ previous status under a new timestamp.
   explicit reviewed memory limit; do not lower rules or paths.
 - `migrate:fresh --seed --force` is destructive only to the isolated local
   Compose database and must use the guarded local fixture.
+- Treat `.env` database credentials and the named
+  `tapoda-next_postgres-data` volume as one persisted local state. Generating a
+  new `.env` against an old volume causes PostgreSQL authentication failure
+  before migration. Preserve the matching `.env`; when a fresh seed is the
+  explicit goal, stop the exact Tapoda containers, verify the exact volume
+  name, disclose recoverability, remove only that volume, then recreate/seed.
 
 ## Definition of Done
 
