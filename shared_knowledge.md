@@ -176,6 +176,15 @@ previous status under a new timestamp.
   before every heavy gate, reject per-run project names, and remove stopped
   candidate containers/networks after the gate. Never remove another project
   or a named volume as routine cleanup.
+- Every candidate project has one explicit lease owner and a list of active
+  coding/review consumers. A feature merge or release does not release the
+  infrastructure lease. PM must ask active consumers and receive an explicit
+  release before teardown; record the handoff in the Issue/PR.
+- Cleanup inventory must include `docker compose ls -a`, exact project-labelled
+  containers, and every enabled tools/browser/restore profile. Normal-profile
+  `down` can leave one-shot profile containers behind. Use the exact project
+  config and relevant profiles, never `-v`, then prove project absence and
+  named-volume preservation.
 - Do not run probes, resets, or test clients with `docker exec` inside the
   PostgreSQL container. PostgreSQL 18 treats an abnormal untracked child exit as
   unsafe and can terminate all backends for crash recovery. Use a separate
