@@ -14,5 +14,7 @@ final class DatabaseSeeder extends Seeder
         $this->call(LocalIdentityAccessSeeder::class);
         $this->call(CourseCatalogSeeder::class);
         $this->call(MemberBrowserFixtureSeeder::class);
+        $this->call(LocalApplicationConsentSeeder::class);
+        $this->call(LocalPreNewFormSeeder::class);
     }
 }
