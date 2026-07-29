@@ -1,4 +1,8 @@
-# Retrospectives
+# Retrospective
+
+Owner: PM/controller. Update at every fixed hourly checkpoint without waiting
+for a user prompt, and immediately when a material delivery, architecture,
+testing, review, or runtime problem changes the plan.
 
 ## 2026-07-29 — Local-complete delivery
 
@@ -36,6 +40,20 @@
 - Add reviewer capacity when review queue, not coding, is the measured bottleneck.
 - Reserve final `gpt-5.6-sol` xhigh security and acceptance review for integrated candidates above 80% completion.
 - Update this file whenever a new delivery, architecture, testing, review, or runtime problem is found.
+- Separate PM state from learning and standards: `progress.md` is the current
+  presentation dashboard, `retrospective.md` is the hourly learning record, and
+  `shared_knowledge.md` is the reusable agent standard.
+- The PM/controller owns release cadence and bottleneck control, not passive
+  status collection. Release reviewed vertical slices to `main` every 60–90
+  minutes when ready.
+- Each assigned agent posts its own phase-boundary GitHub Issue updates. The PM
+  presents from `progress.md` instead of reconstructing status on demand.
+- Every new repeated failure becomes a shared standard or task-packet rule so
+  the next coding agent does not repay the same learning cost.
+- The first `progress.md` draft copied a stale PR #34 pending state even though
+  exact browser CI had already failed. A dashboard timestamp is not evidence.
+  The PM must refresh Issues, PR heads, CI, reviews, agents, and runtimes before
+  every dashboard commit or presentation.
 
 ## Hourly checkpoints
 

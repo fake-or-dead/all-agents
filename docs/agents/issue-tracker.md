@@ -14,6 +14,9 @@ The canonical PRD remains [`docs/product/tapoda-rebuild-prd.md`](../product/tapo
 - Dependencies reference real GitHub issue numbers.
 - Use labels from [`triage-labels.md`](triage-labels.md).
 - Active agents update the issue body or add a progress comment with agent name, branch, exact SHA, checks, blockers, and review state.
+- The assigned agent posts phase-boundary comments itself: start, first
+  executable checkpoint, blocker, local candidate, pushed candidate, review
+  fix, and completion.
 - Completed issues record both reviewer approvals against the same exact SHA before closure.
 
 ## Publishing and fetching
