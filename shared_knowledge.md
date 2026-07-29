@@ -141,6 +141,13 @@ previous status under a new timestamp.
 - Time-boundary tests must control time and response release explicitly. Hold
   an in-flight request, fast-forward the browser clock past expiry, then release
   it; short wall-clock sleeps make correctness depend on runner speed.
+- Never expose a raw PostgreSQL session-formatted timestamp in HTML
+  `datetime` attributes. Prove the stored instant, then render a canonical ISO
+  8601 value with the declared civil timezone; visible Thai/Buddhist text and
+  machine-readable time must remain stable under PostgreSQL `Etc/UTC`.
+- The canonical full PostgreSQL suite uses UTC database/session behavior plus
+  explicit `IDENTITY_DETERMINISTIC_CODE=246810`. Do not set global `PGTZ` to
+  make one module's string assertion pass; it changes Identity expiry meaning.
 - Keyboard-only acceptance uses real Tab/Shift+Tab/Space/Enter navigation and
   asserts every focus transition; direct locator focus/click is not evidence.
 - Full-document Axe checks include shared header/navigation states.
