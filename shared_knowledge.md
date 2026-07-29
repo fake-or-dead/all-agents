@@ -201,6 +201,17 @@ previous status under a new timestamp.
   independently mergeable outcome, explicit predecessor SHA, focused
   acceptance, and exact-SHA review; the umbrella closes only after the complete
   journey and integrated release pass.
+- Size immutable-data work by invariants, not file count. A packet combining
+  publication state, cross-table immutability, concurrent mutation
+  serialization, deterministic repeat-seed integrity, and a read resolver is
+  normally multiple review surfaces. Split it before assignment when each part
+  has an independently useful outcome; never defer a required invariant merely
+  to meet the timebox.
+- Child agents may have different GitHub connector or CLI authority even when
+  SSH push succeeds. The PM/controller owns PR and Issue writes: verify the
+  exact remote SHA and controller `gh auth status`, retry centrally, and only
+  request user re-authentication after both controller CLI and connector paths
+  fail.
 - Focused browser success does not prove the configured full-suite contract.
   Final evidence must run the repository command with its real worker setting.
   Any test sharing PostgreSQL rows, Redis buckets, fixture identities, or rate

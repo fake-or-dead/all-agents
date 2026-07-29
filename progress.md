@@ -1,6 +1,6 @@
 # Delivery Progress
 
-Last updated: 2026-07-29 20:07 +07
+Last updated: 2026-07-29 21:07 +07
 
 Owner: PM/controller. This is the presentation-ready delivery dashboard. Update
 at each merge, blocker, replacement SHA, runtime change, and hourly checkpoint.
@@ -79,9 +79,9 @@ and the authenticated `GET /account` returned HTTP 200.
 | Local seed | coding/review agents complete | Released to `main`/`:8080`; real seeded sign-in verified | None | Keep local-only guard |
 | PHPStan gate | coding/review agents complete | Released to `main`; Issue #37 closed | None | Keep deterministic wrapper gate |
 | Issue #12 member center | coding + dual review agents complete | Released to `main`/`:8080` at `dff85f6`; Issue #12 closed; exact artifact and authenticated URL checks pass | None | Keep regression gates |
-| Issue #13 application | PM + #50 coding/early-review agents | #50 active from exact `a878957`; four of six early findings fixed locally; #57 now tracks server-owned eligibility/persona evidence and blocks #51 | Two #50 review findings plus final gates | Deliver #50 schema/resolver slice; no routes/UI/drafts; do not assign #51 |
+| Issue #13 application | PM + #50 final review agents | PR #59 exact `a11e3b1` has CI 4/4 and acceptance PASS; security review/cross-review pending. #57 has a final People-owned 60–90 minute packet and blocks #51 | #50 security verdict and reciprocal review | Merge #59, release #50, then branch #57 from exact integration merge SHA; do not assign #51 |
 | Issues #14–#32 | PM decomposition complete | #14–#29 have PR-sized decomposition comments; #30–#32 are explicit XL multi-PR local packets with production actions separated | Each waits for predecessor; child Issues created just in time | Never assign original XL packet as one batch |
-| Docker lifecycle | PM/controller | `issue36seed` stopped project removed with volume preserved; `tapoda-next` is live; only PostgreSQL/Redis of `tapoda-issue12-browser` are leased to the #50 coding agent's service gates | Lease owner and active consumer: #50 coding agent | Query that agent before teardown; inventory normal plus `tools`/`restore` profiles; down candidate only after explicit lease release |
+| Docker lifecycle | PM/controller | `tapoda-next` is live; only PostgreSQL/Redis of `tapoda-issue12-browser` remain stable through #50 final review; coding/security DB gates released the lease | Lease owner: PM/controller; no active local consumer | Keep stable until #59 merge/release decision, then profile-aware down without `-v` |
 
 ## Delivery metrics
 

@@ -29,7 +29,7 @@ An auditable reason a person receives the alumni application flow.
 _Avoid_: Prior status check, old-member flag
 
 **Application context evidence**:
-Versioned server-owned facts that select a person's published application form for one course session, including intent, eligibility provenance, and approved category.
+Versioned server-owned person facts that help select a published application form for one course session, including birth date, eligibility provenance, and approved category.
 _Avoid_: Browser persona, applicant-type input, client-supplied age or category
 
 **Staff applicant**:
