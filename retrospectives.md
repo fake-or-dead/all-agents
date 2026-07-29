@@ -36,3 +36,21 @@
 - Add reviewer capacity when review queue, not coding, is the measured bottleneck.
 - Reserve final `gpt-5.6-sol` xhigh security and acceptance review for integrated candidates above 80% completion.
 - Update this file whenever a new delivery, architecture, testing, review, or runtime problem is found.
+
+## Hourly checkpoints
+
+Every active delivery hour records:
+
+1. Merged or directly inspectable output.
+2. Current bottleneck and evidence.
+3. Loop or process failure discovered.
+4. Process change applied immediately.
+5. One measurable target for the next hour.
+
+### 2026-07-29 10:07 +07
+
+- Output: PR #35 second-remediation work split into isolated security/backend and acceptance/UI worktrees. Security patch reached local commit `3138fee`; focused Docker tests previously passed 20 tests / 153 assertions. Acceptance patch is in progress. Nothing new is merged or visible on `localhost:8080` yet.
+- Bottleneck: PR #35 remains the merge dependency for PR #34 and the visible integration runtime.
+- Loop found: the first atomic rate-limit fix locked the combined client/identifier/pair key set. Requests sharing only a client or only an identifier could use different locks and still race on a shared bucket.
+- Change applied: rejected the candidate before push. Required an action-scoped lock or correctly ordered per-bucket/Lua atomic operation plus parallel tests across changing identifiers and changing IPs.
+- Next-hour target: integrate both PR #35 commits, pass focused and full local gates, and produce one replacement SHA ready for dual exact-SHA review.
