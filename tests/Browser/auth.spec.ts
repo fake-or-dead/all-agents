@@ -9,12 +9,26 @@ const password = "browser-password-123";
 // accidentally consume one another's shared client bucket.
 test.describe.configure({ mode: "serial" });
 
+function passportFixtureIdentity(unique: string): string {
+    const suffix = unique
+        .replace(/[^A-Za-z0-9]/g, "")
+        .toUpperCase()
+        .slice(-17)
+        .padStart(3, "0");
+    const identity = `E2E${suffix}`;
+
+    expect(identity).toMatch(/^[A-Z0-9]{6,20}$/);
+    expect(identity.length).toBeLessThanOrEqual(20);
+
+    return identity;
+}
+
 async function registerAccount(
     page: Page,
     unique: string,
 ): Promise<{ email: string; identity: string }> {
     const email = `browser-auth-${unique}@example.test`;
-    const identity = `E2E${unique}`;
+    const identity = passportFixtureIdentity(unique);
 
     await page.goto("/signup");
     await page.getByLabel("อีเมล").fill(email);
