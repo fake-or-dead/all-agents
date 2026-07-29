@@ -508,6 +508,105 @@ code {
     padding-block: var(--space-8) var(--space-12);
 }
 
+.member-shell {
+    width: min(100% - (2 * var(--space-4)), var(--size-content));
+    margin-inline: auto;
+    padding-block: var(--space-8) var(--space-12);
+}
+
+.member-heading {
+    max-width: 48rem;
+}
+
+.member-tabs {
+    display: flex;
+    overflow-x: auto;
+    gap: var(--space-2);
+    margin-block: var(--space-6);
+    padding-block: var(--space-1);
+}
+
+.member-tabs a {
+    min-height: var(--size-touch);
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-small);
+    color: var(--text-link);
+    background: var(--surface-default);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.member-tabs a[aria-current="page"] {
+    color: var(--text-inverse);
+    border-color: var(--action-primary);
+    background: var(--action-primary);
+}
+
+.member-panel {
+    padding: clamp(var(--space-4), 5vw, var(--space-8));
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-medium);
+    background: var(--surface-elevated);
+}
+
+.member-subsection {
+    margin-top: var(--space-8);
+    padding-top: var(--space-8);
+    border-top: 1px solid var(--border-default);
+}
+
+.member-list {
+    display: grid;
+    gap: var(--space-3);
+    margin: var(--space-6) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.member-list li,
+.member-empty {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-4);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-small);
+    background: var(--surface-page);
+}
+
+.member-list dl {
+    display: grid;
+    grid-template-columns: minmax(7rem, auto) 1fr;
+    gap: var(--space-2) var(--space-4);
+    margin: 0;
+}
+
+.member-list dt {
+    font-weight: 600;
+}
+
+.member-list dd {
+    margin: 0;
+}
+
+.field-error {
+    margin: 0;
+    color: var(--status-blocked);
+}
+
+.reference-load-error {
+    display: grid;
+    gap: var(--space-2);
+    margin-block-start: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--status-blocked);
+    border-radius: var(--radius-medium);
+}
+
+.reference-load-error p {
+    margin: 0;
+}
+
 .auth-card {
     padding: clamp(var(--space-4), 5vw, var(--space-8));
     border: 1px solid var(--border-default);

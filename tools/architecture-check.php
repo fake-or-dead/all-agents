@@ -9,7 +9,7 @@ $allowedDependencies = [
     'CourseCatalog' => ['ApplicationWorkflow', 'DocumentsConsent'],
     'DocumentsConsent' => [],
     'IdentityAccess' => ['DocumentsConsent', 'People'],
-    'People' => [],
+    'People' => ['ReferenceData'],
     'PlatformOperations' => ['Audit', 'IdentityAccess'],
     'ReferenceData' => [],
 ];
@@ -40,7 +40,14 @@ $ownedTables = [
         'auth_sessions',
         'local_verification_deliveries',
     ],
-    'People' => ['people', 'person_identifiers', 'person_account_link_proofs'],
+    'People' => [
+        'people',
+        'person_identifiers',
+        'person_account_link_proofs',
+        'person_contacts',
+        'person_addresses',
+        'person_training_experiences',
+    ],
     'ReferenceData' => ['provinces', 'amphoes', 'tambons'],
 ];
 $violations = [];
@@ -95,8 +102,7 @@ foreach ($modules as $module) {
             }
 
             if (
-                $module === 'CourseCatalog'
-                && ! str_starts_with($match[2], 'Contracts\\')
+                ! str_starts_with($match[2], 'Contracts\\')
                 && ! str_starts_with($match[2], 'Data\\')
             ) {
                 $violations[] = "{$file->getPathname()} bypasses the {$dependency} public port";

@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\RequireActiveAccountSession;
 use App\Models\Account;
 use App\Modules\IdentityAccess\Contracts\ApplicantIdentityResolver;
+use Carbon\CarbonImmutable;
 use Database\Seeders\CourseCatalogSeeder;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -75,8 +76,32 @@ final class PublicCourseCatalogTest extends TestCase
             ->assertSee('20 สิงหาคม 2569')
             ->assertSee('1 กรกฎาคม 2569 เวลา 00:00 น. (Asia/Bangkok)')
             ->assertSee('5 สิงหาคม 2569 เวลา 23:59 น. (Asia/Bangkok)')
-            ->assertSee('datetime="2026-07-01 00:00:00+07"', false)
+            ->assertSee('datetime="2026-07-01T00:00:00+07:00"', false)
             ->assertSee('กรอกข้อมูลให้ครบเพื่อประเมินสิทธิ์เบื้องต้น');
+    }
+
+    public function test_course_registration_instants_and_html_are_portable_under_canonical_utc(): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement("SET TIME ZONE 'UTC'");
+        }
+
+        $stored = DB::table('course_sessions')
+            ->where('code', 'D10-2026-08-TAPODA')
+            ->value('registration_opens_at');
+
+        self::assertTrue(
+            CarbonImmutable::parse((string) $stored)->equalTo(
+                CarbonImmutable::parse('2026-07-01T00:00:00+07:00'),
+            ),
+            'The stored registration opening must remain the same canonical instant.',
+        );
+
+        $this->get('/course/detail/D10-2026-08-TAPODA')
+            ->assertOk()
+            ->assertSee('1 กรกฎาคม 2569 เวลา 00:00 น. (Asia/Bangkok)')
+            ->assertSee('datetime="2026-07-01T00:00:00+07:00"', false)
+            ->assertSee('datetime="2026-08-05T23:59:59+07:00"', false);
     }
 
     public function test_eligibility_returns_explicit_eligible_and_unavailable_outcomes(): void

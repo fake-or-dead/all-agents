@@ -129,6 +129,10 @@ previous status under a new timestamp.
 - Long-running Playwright gates run from a root-owned persistent execution
   session and require the final exit code. Partial `13/16` or `15/16` output is
   not evidence.
+- Never run parallel Playwright processes against the same stateful runtime or
+  database. A passed assertion without a terminal exit is not evidence. Run
+  shared-runtime cases serially, await prior real requests and route cleanup,
+  and reset fixtures after request-count contamination.
 - Bind Playwright to an explicit candidate URL and recovery container.
 - Do not reuse partially exercised Redis rate-limit state as a clean full-suite
   environment.
@@ -141,6 +145,13 @@ previous status under a new timestamp.
 - Time-boundary tests must control time and response release explicitly. Hold
   an in-flight request, fast-forward the browser clock past expiry, then release
   it; short wall-clock sleeps make correctness depend on runner speed.
+- Never expose a raw PostgreSQL session-formatted timestamp in HTML
+  `datetime` attributes. Prove the stored instant, then render a canonical ISO
+  8601 value with the declared civil timezone; visible Thai/Buddhist text and
+  machine-readable time must remain stable under PostgreSQL `Etc/UTC`.
+- The canonical full PostgreSQL suite uses UTC database/session behavior plus
+  explicit `IDENTITY_DETERMINISTIC_CODE=246810`. Do not set global `PGTZ` to
+  make one module's string assertion pass; it changes Identity expiry meaning.
 - Keyboard-only acceptance uses real Tab/Shift+Tab/Space/Enter navigation and
   asserts every focus transition; direct locator focus/click is not evidence.
 - Full-document Axe checks include shared header/navigation states.
@@ -150,6 +161,65 @@ previous status under a new timestamp.
   explicit reviewed memory limit; do not lower rules or paths.
 - `migrate:fresh --seed --force` is destructive only to the isolated local
   Compose database and must use the guarded local fixture.
+- Treat `.env` database credentials and the named
+  `tapoda-next_postgres-data` volume as one persisted local state. Generating a
+  new `.env` against an old volume causes PostgreSQL authentication failure
+  before migration. Preserve the matching `.env`; when a fresh seed is the
+  explicit goal, stop the exact Tapoda containers, verify the exact volume
+  name, disclose recoverability, remove only that volume, then recreate/seed.
+- Reuse stable local infrastructure. Keep `tapoda-next` for user checks on
+  `localhost:8080` and at most one active candidate project for serial browser
+  gates. A new SHA may replace only the app container/image; it must not create
+  a new PostgreSQL, Redis, network, or volume when the existing services are
+  healthy.
+- The PM/controller owns Docker lifecycle. Inspect active Compose projects
+  before every heavy gate, reject per-run project names, and remove stopped
+  candidate containers/networks after the gate. Never remove another project
+  or a named volume as routine cleanup.
+- Do not run probes, resets, or test clients with `docker exec` inside the
+  PostgreSQL container. PostgreSQL 18 treats an abnormal untracked child exit as
+  unsafe and can terminate all backends for crash recovery. Use a separate
+  ephemeral client or the app connection, serialize reset/seed/probes, require
+  three consecutive readiness checks, then warm the first browser route.
+- Ephemeral test containers are allowed only one at a time with `--rm` against
+  the reused services. Keep the normal Playwright timeout; infrastructure delay
+  must be diagnosed rather than hidden by a longer timeout.
+- A fully specified packet is not necessarily a PR-sized task. Keep one
+  umbrella Issue for the complete user outcome, but split implementation before
+  assignment when it contains more than one principal state machine/owner or
+  cannot reasonably reach review within 60–90 minutes. Each child has one
+  independently mergeable outcome, explicit predecessor SHA, focused
+  acceptance, and exact-SHA review; the umbrella closes only after the complete
+  journey and integrated release pass.
+- Focused browser success does not prove the configured full-suite contract.
+  Final evidence must run the repository command with its real worker setting.
+  Any test sharing PostgreSQL rows, Redis buckets, fixture identities, or rate
+  limits must be serial, or must prove unique isolated state.
+- Browser fixture provisioning is part of the deployed test contract. A local
+  environment variable or ad hoc seeder invocation is not enough when GitHub CI
+  uses another bootstrap path. Assert fixture/API readiness at the request
+  boundary before selecting dependent UI options, so missing data or HTTP
+  failure is reported directly rather than as a later timeout.
+- Every retryable create command needs persisted actor-scoped idempotency in the
+  same transaction as the domain mutation and audit. Same key plus same payload
+  returns the original result; same key plus different payload conflicts;
+  concurrent or ambiguous-response replay produces one mutation and one audit.
+- Browser-held idempotency must survive the recovery actions the UI presents.
+  For a create operation with ambiguous outcome, retain one opaque operation
+  UUID across network errors, HTTP 5xx, payload edits, visible reload, and manual
+  reload. Store no domain payload or PII in browser persistence. Clear the key
+  only after confirmed success/replay or explicit reconciled abandonment.
+- Do not store an unkeyed deterministic digest of low-entropy encrypted domain
+  fields. It exposes equality and enables dictionary testing. Persist a
+  randomized authenticated encrypted canonical request or use a reviewed,
+  versioned domain-keyed construction; compare only inside the authorized
+  transaction and fail closed on corrupt/unreadable evidence.
+- Secret scanning applies to the complete PR commit range, not only the final
+  tree. A later commit that removes a synthetic secret-like literal does not
+  erase the detector finding. Preserve a local backup, rebuild the feature range
+  from the exact base into clean history, prove final-tree equivalence, and
+  force-push only with an exact lease. Never disable or broadly allowlist the
+  scanner to hide a committed finding.
 
 ## Definition of Done
 

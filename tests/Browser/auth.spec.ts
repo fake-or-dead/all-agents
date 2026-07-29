@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 
 const password = "browser-password-123";
 
@@ -8,6 +9,11 @@ const password = "browser-password-123";
 // Keep these stateful browser journeys sequential so independent flows do not
 // accidentally consume one another's shared client bucket.
 test.describe.configure({ mode: "serial" });
+test.beforeEach(async ({ context }) => {
+    await context.setExtraHTTPHeaders({
+        "X-Tapoda-Test-Client": `auth-${randomUUID()}`,
+    });
+});
 
 function passportFixtureIdentity(unique: string): string {
     const suffix = unique

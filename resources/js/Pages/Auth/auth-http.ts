@@ -3,13 +3,24 @@ export async function submitJson(
     csrfToken: string,
     body: Record<string, unknown>,
 ): Promise<{ ok: boolean; status: number; body: Record<string, unknown> }> {
+    return requestJson(url, csrfToken, body, "POST");
+}
+
+export async function requestJson(
+    url: string,
+    csrfToken: string,
+    body: Record<string, unknown>,
+    method: "POST" | "PUT" | "DELETE",
+    additionalHeaders: Record<string, string> = {},
+): Promise<{ ok: boolean; status: number; body: Record<string, unknown> }> {
     try {
         const response = await fetch(url, {
-            method: "POST",
+            method,
             headers: {
                 Accept: "application/json",
                 "Content-Type": "application/json",
                 "X-CSRF-TOKEN": csrfToken,
+                ...additionalHeaders,
             },
             body: JSON.stringify(body),
         });

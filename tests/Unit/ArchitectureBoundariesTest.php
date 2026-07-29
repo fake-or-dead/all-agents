@@ -132,6 +132,60 @@ final class ArchitectureBoundariesTest extends TestCase
         );
     }
 
+    public function test_people_cannot_import_reference_data_infrastructure(): void
+    {
+        $root = $this->fixtureRoot();
+        $this->createExpectedModules($root);
+        file_put_contents(
+            "{$root}/People/Infrastructure/Forbidden.php",
+            '<?php use App\\Modules\\ReferenceData\\Infrastructure\\Persistence\\DatabaseReferenceData;',
+        );
+
+        $result = $this->check($root);
+
+        self::assertSame(1, $result['exitCode']);
+        self::assertStringContainsString(
+            'bypasses the ReferenceData public port',
+            $result['output'],
+        );
+    }
+
+    public function test_people_cannot_read_application_workflow_owned_table(): void
+    {
+        $root = $this->fixtureRoot();
+        $this->createExpectedModules($root);
+        file_put_contents(
+            "{$root}/People/Infrastructure/Forbidden.php",
+            "<?php DB::table('application_workflow_facts')->first();",
+        );
+
+        $result = $this->check($root);
+
+        self::assertSame(1, $result['exitCode']);
+        self::assertStringContainsString(
+            'accesses ApplicationWorkflow-owned table application_workflow_facts',
+            $result['output'],
+        );
+    }
+
+    public function test_application_workflow_cannot_read_people_current_profile_tables(): void
+    {
+        $root = $this->fixtureRoot();
+        $this->createExpectedModules($root);
+        file_put_contents(
+            "{$root}/ApplicationWorkflow/Infrastructure/Forbidden.php",
+            "<?php DB::table('person_contacts')->first();",
+        );
+
+        $result = $this->check($root);
+
+        self::assertSame(1, $result['exitCode']);
+        self::assertStringContainsString(
+            'accesses People-owned table person_contacts',
+            $result['output'],
+        );
+    }
+
     private function fixtureRoot(): string
     {
         $root = sys_get_temp_dir().'/tapoda-architecture-'.bin2hex(random_bytes(6));

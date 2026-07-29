@@ -1,6 +1,6 @@
 # Delivery Progress
 
-Last updated: 2026-07-29 14:57 +07
+Last updated: 2026-07-29 19:26 +07
 
 Owner: PM/controller. This is the presentation-ready delivery dashboard. Update
 at each merge, blocker, replacement SHA, runtime change, and hourly checkpoint.
@@ -12,33 +12,38 @@ GitHub Issues remain the task-level source of truth.
   a verified Docker application at `http://localhost:8080`.
 - Explicit exclusions: production approvals, production writes, cutover, and
   destructive legacy retirement.
-- Scope tracker: 12 closed / 20 open.
-- Default-branch release: PR #40 merged at
-  `9749eaec91e154584366bc64261e9fb3d2c6d5e2`; reviewed head `daf9cd9`, CI
-  4/4, dual reciprocal approval complete. It follows PR #39, which delivered
-  Foundation + Account and removed tracked `.scratch/tapoda-rebuild/`.
+- Scope tracker: 11 complete / 21 open. Issue #12 is merged and closed in
+  GitHub, but remains release-pending under the localhost Definition of Done.
+- Default-branch release: PR #43 merged at
+  `b3ff3825e289d40b0d202d077c7332d2255cc175`; reviewed head `dda4177`,
+  duplicate exact-SHA CI runs both passed 4/4, and dual reciprocal approval is
+  complete. It delivers Course Catalog, the PHPStan gate, PM docs, and the
+  guarded local seed after PR #39/#40.
 - Current local visible runtime: `http://localhost:8080` serves exact `main`
-  merge `9749eaec` using content-addressed image
-  `sha256:a0de2d18c138cb560aa2ef111aaa71652df7befc2adc1ffc47feb28362b2b8ca`.
-  Migration, runtime artifact assertion, readiness, and smoke pass.
+  merge `b3ff3825` using content-addressed image
+  `sha256:f4cf9c5cea8b340ca38d812dc65defdc6e5dbd3863e38f57100f1beaf6f1a6b7`.
+  Fresh local migration/seed, artifact assertion, readiness, smoke, Catalog
+  content checks, and seeded HTTP sign-in pass.
+- Integration head `e34bf6c99df8dc2ea6cf69e756f62f034f044cac`
+  merges PR #48's Member Center after exact head `e68d9dd` passed CI 4/4,
+  security and acceptance review, and reciprocal cross-review. Issue #12 is
+  closed. It will ride the next user-visible release.
 
 ## User check URLs
 
 | URL | Expected result | Verified |
 | --- | --- | --- |
 | `http://localhost:8080/` | Thai system-state page | HTTP 200 |
+| `http://localhost:8080/course?year=2026` | Seeded Course Catalog for 2026 | HTTP 200; three seeded course links found |
+| `http://localhost:8080/course/detail/D10-2026-08-TAPODA` | Seeded course detail, policy, and document status | HTTP 200; code/document content found |
 | `http://localhost:8080/signup` | Create a local account | HTTP 200 |
-| `http://localhost:8080/signin` | Sign in with an account created locally | HTTP 200 |
+| `http://localhost:8080/signin` | Sign in with the seeded account below | HTTP 200 |
 | `http://localhost:8080/forgot` | Start local password recovery | HTTP 200 |
 | `http://localhost:8080/account` | Account security page; redirects to sign-in when anonymous | HTTP 302 to `/signin` |
 | `http://localhost:8080/health/live` | Process liveness JSON | HTTP 200 |
 | `http://localhost:8080/health/ready` | PostgreSQL, Redis, worker, and scheduler readiness JSON | HTTP 200 |
 
-There is no supported seeded account on the currently running `main` release.
-The current `main` seeder still references removed `App\Models\User`; do not run
-it. Create an account through `/signup`.
-
-Issue #36 reserves this local-only candidate account:
+Supported local-only seeded account:
 
 - Sign-in ID: `1234567890123`
 - Password: `TapodaLocalSeed!2026`
@@ -47,11 +52,9 @@ Issue #36 reserves this local-only candidate account:
 PR #42 exact head `478a5a734fb7ccec9a0e835dbcd1076b104091a3`
 passed a fresh isolated PostgreSQL seed, readiness/smoke, real HTTP sign-in to
 `/account`, CI 4/4, and dual reciprocal review. It merged to integration at
-`a9389ac23de2e6eaaadefe3f4279b17a6c6c9f1e`; Issue #36 is closed. These
-credentials are not usable on `localhost:8080` until PR #43 merges to `main`
-and the runtime is rebuilt.
-Course Catalog is merged to integration but its URLs are not listed as live
-until the next `main` release and `localhost:8080` rebuild.
+`a9389ac23de2e6eaaadefe3f4279b17a6c6c9f1e`; Issue #36 is closed. On the
+exact `main` runtime, `POST /signin` returned HTTP 200 with redirect `/account`,
+and the authenticated `GET /account` returned HTTP 200.
 
 ## Release train
 
@@ -59,26 +62,30 @@ until the next `main` release and `localhost:8080` rebuild.
 | --- | --- | --- | --- | --- |
 | 1 | Foundation + Account to `main`; remove `.scratch/tapoda-rebuild/` | Delivered | PR #39 merge `8169f11`, reviewed `71bf9af`, CI 4/4, dual reciprocal PASS | Keep as release baseline |
 | 2 | PM operating system | Delivered | PR #40 merge `9749eaec`, reviewed `daf9cd9`, CI 4/4, dual reciprocal PASS | Keep dashboard authoritative |
-| 3 | Course Catalog canonical ownership | Delivered to integration; Issue #10 closed | PR #34 merge `e675535`, reviewed `0eb7fe2`, CI `30431450234` 4/4, Browser 26/26, dual reciprocal PASS | Include in next `main` release and rebuild `:8080` |
-| 4 | Deterministic PHPStan memory gate | Delivered to integration | PR #38 merge `762ff4c`, reviewed `c62ae43`, CI 4/4, dual reciprocal PASS | Include in next `main` release |
-| 5 | Safe canonical local seed | Delivered to integration; Issue #36 closed | PR #42 merge `a9389ac`, reviewed `478a5a7`, CI 4/4, fresh seed/sign-in and dual reciprocal PASS | Include in PR #43 release and rebuild `:8080` |
-| 6 | Profile/application security | Not started | Issue #12 | Start after #34 schema lands |
+| 3 | Course Catalog canonical ownership | Delivered to `main`/`:8080`; Issue #10 closed | PR #34 merge `e675535`, PR #43 merge `b3ff382`, Browser 26/26, local Catalog checks pass | Keep as release baseline |
+| 4 | Deterministic PHPStan memory gate | Delivered to `main` | PR #38 merge `762ff4c`, PR #43 merge `b3ff382`, CI 4/4 | Keep as release gate |
+| 5 | Safe canonical local seed | Delivered to `main`/`:8080`; Issue #36 closed | PR #42 merge `a9389ac`, PR #43 merge `b3ff382`, fresh local seed/sign-in pass | Keep credentials and reset instructions current |
+| 6 | Profile/application security | Delivered to integration; Issue #12 closed; release to `main` pending | PR #48 merge `e34bf6c`; reviewed `e68d9dd`; CI 4/4; security/acceptance PASS and reciprocal AGREE; exact candidate image `a0b898b5...` healthy on reused `:18012` | Merge PM docs, then release integration to `main`/`:8080` |
 
 ## Active workstreams
 
 | Workstream | Owner | Status | Blocker | Next checkpoint |
 | --- | --- | --- | --- | --- |
-| Release control | PM/controller | PR #39 and PR #40 merged to `main`; exact release live on `:8080` | None | Release Course Catalog when green |
+| Release control | PM/controller | PR #43 merged at `b3ff382`; exact release live on `:8080`; PR #45 already merged at `3444bfd` | Member Center integration awaits release | Merge PR #49, then open the small integration-to-main release PR |
 | PM operating system | PM/controller | Delivered and active | None | Refresh dashboard at every phase boundary |
-| Course Catalog | coding + dual review agents complete | PR #34 merged at `e675535`; Issue #10 closed | Not yet released to `main`/`:8080` | Ship next small release |
-| Local seed | coding/review agents complete | PR #42 merged at `a9389ac`; Issue #36 closed | Not yet released to `main`/`:8080` | Ship through PR #43 and verify seeded sign-in on `:8080` |
-| PHPStan gate | coding/review agents complete | PR #38 merged at `762ff4c`; Issue #37 closed | None | Ship with next release |
-| Issue #12 member center | coding agent active | Implementation task packet posted at Issue comment `5114102073`; isolated branch from integration `e675535` | Must not overlap PR #42 seed files | Produce focused local candidate and issue checkpoint |
+| Course Catalog | coding + dual review agents complete | Released to `main`/`:8080`; URLs verified above | None | Keep regression gates |
+| Local seed | coding/review agents complete | Released to `main`/`:8080`; real seeded sign-in verified | None | Keep local-only guard |
+| PHPStan gate | coding/review agents complete | Released to `main`; Issue #37 closed | None | Keep deterministic wrapper gate |
+| Issue #12 member center | coding + dual review agents complete | PR #48 merged at `e34bf6c`; Issue #12 closed; exact candidate `e68d9dd` and image `a0b898b5...` remain healthy on reused `:18012` | Main release train | Release after PR #49 |
+| Issue #13 application | PM decomposed | Umbrella retained; child Issues #50–#54 track Form Engine, start/resume, autosave, atomic submit, receipt/timeline; #50 preflight published | Main release of #12 | Branch #50 from exact post-merge integration SHA after release |
+| Issues #14–#32 | PM decomposition complete | #14–#29 have PR-sized decomposition comments; #30–#32 are explicit XL multi-PR local packets with production actions separated | Each waits for predecessor; child Issues created just in time | Never assign original XL packet as one batch |
+| Docker lifecycle | PM/controller | 18 stale Compose projects, four stopped containers, and orphan smoke container `blissful_khayyam` removed; volumes preserved; main and one candidate stack reuse healthy PostgreSQL/Redis | None | Keep only `tapoda-next` and one active candidate project; inventory before/after every heavy gate |
 
 ## Delivery metrics
 
-- Observed first 11 hours: 10/32 scopes closed; three implementation slices
-  reached done or review-ready.
+- Current scope progress: 11/32 scopes complete. Issue #12 is integrated and
+  its tracker is closed, but it becomes scope 12/32 only after the next small
+  `main` release and verified `localhost:8080` rebuild.
 - Naive scope velocity is misleading because #1–#8 are decision gates and later
   lifecycle, migration, report, and staff scopes are larger.
 - Current forecast for local completion: 96–120 continuous hours at the

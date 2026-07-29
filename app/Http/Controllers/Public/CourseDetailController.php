@@ -101,6 +101,16 @@ final class CourseDetailController extends Controller
                     (string) $view->session['timezone'],
                 ),
             ],
+            'machineDates' => [
+                'registration_opens_at' => $dates->dateTimeAttribute(
+                    (string) $view->session['registration_opens_at'],
+                    (string) $view->session['timezone'],
+                ),
+                'registration_closes_at' => $dates->dateTimeAttribute(
+                    (string) $view->session['registration_closes_at'],
+                    (string) $view->session['timezone'],
+                ),
+            ],
             'eligibilityInput' => $eligibilityInput,
             'inputErrors' => $inputErrors,
         ]);
