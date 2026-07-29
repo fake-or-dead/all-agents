@@ -45,7 +45,7 @@ async function registerAccount(
     await page.getByLabel("ยืนยันรหัสผ่านใหม่").fill(password);
     await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: "สร้างบัญชี" }).click();
-    await expect(page).toHaveURL(/\/account$/);
+    await expect(page).toHaveURL(/\/account$/, { timeout: 10_000 });
 
     return { email, identity };
 }
@@ -293,9 +293,14 @@ test("FLOW-AUTH-01 in-flight signup keeps its success response after proof expir
 }, testInfo) => {
     const unique = `${Date.now()}${testInfo.workerIndex}inflight`;
     const email = `inflight-${unique}@example.test`;
+    const proofIssuedAt = Date.UTC(2026, 6, 29, 6);
     let signupDispatched!: () => void;
     const dispatched = new Promise<void>((resolve) => {
         signupDispatched = resolve;
+    });
+    let releaseSignup!: () => void;
+    const signupRelease = new Promise<void>((resolve) => {
+        releaseSignup = resolve;
     });
 
     await page.route("**/auth/verification/verify", async (route) => {
@@ -304,7 +309,7 @@ test("FLOW-AUTH-01 in-flight signup keeps its success response after proof expir
             contentType: "application/json",
             body: JSON.stringify({
                 registration_token: "p".repeat(64),
-                expires_at: new Date(Date.now() + 1_200).toISOString(),
+                expires_at: new Date(proofIssuedAt + 60_000).toISOString(),
             }),
         });
     });
@@ -317,6 +322,7 @@ test("FLOW-AUTH-01 in-flight signup keeps its success response after proof expir
             }),
         });
     });
+    await page.clock.install({ time: proofIssuedAt });
     await page.goto("/signup");
     await page.getByLabel("อีเมล").fill(email);
     await page.getByRole("button", { name: "ขอรหัส" }).click();
@@ -336,7 +342,7 @@ test("FLOW-AUTH-01 in-flight signup keeps its success response after proof expir
             return;
         }
         signupDispatched();
-        await new Promise((resolve) => setTimeout(resolve, 1_500));
+        await signupRelease;
         await route.fulfill({
             status: 201,
             contentType: "application/json",
@@ -344,11 +350,14 @@ test("FLOW-AUTH-01 in-flight signup keeps its success response after proof expir
         });
     });
 
-    await page.getByRole("button", { name: "สร้างบัญชี" }).click();
+    const submission = page.getByRole("button", { name: "สร้างบัญชี" }).click();
     await dispatched;
     await expect(
         page.getByRole("button", { name: "กำลังสร้างบัญชี…" }),
     ).toBeDisabled();
+    await page.clock.fastForward(60_001);
+    releaseSignup();
+    await submission;
     await expect(page).toHaveURL(/\/signup-complete$/);
 });
 
@@ -357,6 +366,15 @@ test("FLOW-AUTH-01 in-flight signup handles rejection after proof expiry", async
 }, testInfo) => {
     const unique = `${Date.now()}${testInfo.workerIndex}rejected`;
     const email = `rejected-${unique}@example.test`;
+    const proofIssuedAt = Date.UTC(2026, 6, 29, 6);
+    let signupDispatched!: () => void;
+    const dispatched = new Promise<void>((resolve) => {
+        signupDispatched = resolve;
+    });
+    let releaseSignup!: () => void;
+    const signupRelease = new Promise<void>((resolve) => {
+        releaseSignup = resolve;
+    });
 
     await page.route("**/auth/verification/verify", async (route) => {
         await route.fulfill({
@@ -364,7 +382,7 @@ test("FLOW-AUTH-01 in-flight signup handles rejection after proof expiry", async
             contentType: "application/json",
             body: JSON.stringify({
                 registration_token: "p".repeat(64),
-                expires_at: new Date(Date.now() + 1_200).toISOString(),
+                expires_at: new Date(proofIssuedAt + 60_000).toISOString(),
             }),
         });
     });
@@ -377,6 +395,7 @@ test("FLOW-AUTH-01 in-flight signup handles rejection after proof expiry", async
             }),
         });
     });
+    await page.clock.install({ time: proofIssuedAt });
     await page.goto("/signup");
     await page.getByLabel("อีเมล").fill(email);
     await page.getByRole("button", { name: "ขอรหัส" }).click();
@@ -395,7 +414,8 @@ test("FLOW-AUTH-01 in-flight signup handles rejection after proof expiry", async
             await route.continue();
             return;
         }
-        await new Promise((resolve) => setTimeout(resolve, 1_500));
+        signupDispatched();
+        await signupRelease;
         await route.fulfill({
             status: 422,
             contentType: "application/json",
@@ -403,7 +423,11 @@ test("FLOW-AUTH-01 in-flight signup handles rejection after proof expiry", async
         });
     });
 
-    await page.getByRole("button", { name: "สร้างบัญชี" }).click();
+    const submission = page.getByRole("button", { name: "สร้างบัญชี" }).click();
+    await dispatched;
+    await page.clock.fastForward(60_001);
+    releaseSignup();
+    await submission;
     await expect(page.getByRole("alert")).toHaveText(
         "ข้อมูลสมัครไม่ผ่านการตรวจสอบ",
     );
