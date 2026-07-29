@@ -186,6 +186,24 @@ final class ArchitectureBoundariesTest extends TestCase
         );
     }
 
+    public function test_application_workflow_cannot_read_people_application_context_evidence_table(): void
+    {
+        $root = $this->fixtureRoot();
+        $this->createExpectedModules($root);
+        file_put_contents(
+            "{$root}/ApplicationWorkflow/Infrastructure/Forbidden.php",
+            "<?php DB::table('person_application_context_evidence')->first();",
+        );
+
+        $result = $this->check($root);
+
+        self::assertSame(1, $result['exitCode']);
+        self::assertStringContainsString(
+            'accesses People-owned table person_application_context_evidence',
+            $result['output'],
+        );
+    }
+
     public function test_form_engine_cannot_import_another_modules_infrastructure(): void
     {
         $root = $this->fixtureRoot();

@@ -57,6 +57,7 @@ $ownedTables = [
         'person_contacts',
         'person_addresses',
         'person_training_experiences',
+        'person_application_context_evidence',
     ],
     'ReferenceData' => ['provinces', 'amphoes', 'tambons'],
 ];

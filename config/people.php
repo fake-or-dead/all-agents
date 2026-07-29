@@ -2,6 +2,14 @@
 
 $lookupVersion = (string) env('PEOPLE_IDENTIFIER_LOOKUP_KEY_VERSION', 'v1');
 $previousVersion = (string) env('PEOPLE_IDENTIFIER_LOOKUP_PREVIOUS_VERSION', '');
+$contextEvidenceVersion = (string) env('PEOPLE_CONTEXT_EVIDENCE_KEY_VERSION', 'v1');
+$contextEvidenceKey = env('PEOPLE_CONTEXT_EVIDENCE_KEY');
+if (
+    (! is_string($contextEvidenceKey) || $contextEvidenceKey === '')
+    && env('APP_ENV') === 'testing'
+) {
+    $contextEvidenceKey = env('APP_KEY');
+}
 
 return [
     'identifier_lookup_key_version' => $lookupVersion,
@@ -10,5 +18,9 @@ return [
     'identifier_lookup_keys' => array_filter([
         $lookupVersion => env('PEOPLE_IDENTIFIER_LOOKUP_KEY'),
         $previousVersion => env('PEOPLE_IDENTIFIER_LOOKUP_PREVIOUS_KEY'),
+    ], static fn (mixed $value, string $key): bool => $key !== '' && is_string($value) && $value !== '', ARRAY_FILTER_USE_BOTH),
+    'context_evidence_key_version' => $contextEvidenceVersion,
+    'context_evidence_keys' => array_filter([
+        $contextEvidenceVersion => $contextEvidenceKey,
     ], static fn (mixed $value, string $key): bool => $key !== '' && is_string($value) && $value !== '', ARRAY_FILTER_USE_BOTH),
 ];

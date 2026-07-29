@@ -12,6 +12,7 @@ final class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(LocalIdentityAccessSeeder::class);
+        $this->call(LocalApplicationContextEvidenceSeeder::class);
         $this->call(CourseCatalogSeeder::class);
         $this->call(MemberBrowserFixtureSeeder::class);
         $this->call(LocalApplicationConsentSeeder::class);

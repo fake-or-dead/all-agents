@@ -9,6 +9,7 @@ php_image="php:8.5-cli-bookworm@sha256:fb740987f3e7aefd7f52d1f961fa91602874f2b6a
 app_key="$(docker run --rm "${php_image}" php -r 'echo "base64:".base64_encode(random_bytes(32));')"
 db_password="$(docker run --rm "${php_image}" php -r 'echo bin2hex(random_bytes(24));')"
 people_lookup_key="$(docker run --rm "${php_image}" php -r 'echo bin2hex(random_bytes(32));')"
+context_evidence_key="$(docker run --rm "${php_image}" php -r 'echo "base64:".base64_encode(random_bytes(32));')"
 account_lookup_key="$(docker run --rm "${php_image}" php -r 'echo bin2hex(random_bytes(32));')"
 rate_limit_key="$(docker run --rm "${php_image}" php -r 'echo bin2hex(random_bytes(32));')"
 verification_code="$(docker run --rm "${php_image}" php -r 'echo random_int(100000, 999999);')"
@@ -41,6 +42,8 @@ set_if_empty PEOPLE_IDENTIFIER_LOOKUP_KEY_VERSION "v1"
 set_if_empty PEOPLE_IDENTIFIER_LOOKUP_KEY "${people_lookup_key}"
 ensure_present PEOPLE_IDENTIFIER_LOOKUP_PREVIOUS_VERSION
 ensure_present PEOPLE_IDENTIFIER_LOOKUP_PREVIOUS_KEY
+set_if_empty PEOPLE_CONTEXT_EVIDENCE_KEY_VERSION "v1"
+set_if_empty PEOPLE_CONTEXT_EVIDENCE_KEY "${context_evidence_key}"
 set_if_empty IDENTITY_ACCOUNT_LOOKUP_KEY_VERSION "v1"
 set_if_empty IDENTITY_ACCOUNT_LOOKUP_KEY "${account_lookup_key}"
 ensure_present IDENTITY_ACCOUNT_LOOKUP_PREVIOUS_VERSION
