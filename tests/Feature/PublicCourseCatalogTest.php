@@ -34,6 +34,12 @@ final class PublicCourseCatalogTest extends TestCase
             ->assertSee('name="course_type"', false)
             ->assertSee('name="center"', false)
             ->assertSee('D10-2026-08-TAPODA')
+            ->assertSee('ปี พ.ศ.')
+            ->assertSee('<option value="2026" selected>2569</option>', false)
+            ->assertSee('<option value="8" selected>สิงหาคม</option>', false)
+            ->assertSee('10 สิงหาคม 2569')
+            ->assertSee('20 สิงหาคม 2569')
+            ->assertSee('datetime="2026-08-10"', false)
             ->assertDontSee('STAFF-2026-09-BKK')
             ->assertDontSee('data-page=', false);
     }

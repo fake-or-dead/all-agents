@@ -24,15 +24,20 @@
     <form class="filter-panel" method="get" action="{{ route('course-catalog.index') }}">
         <div class="filter-grid">
             <div>
-                <label for="year">ปี ค.ศ.</label>
-                <input id="year" name="year" inputmode="numeric" value="{{ $filters['year'] }}" placeholder="2026">
+                <label for="year">ปี พ.ศ.</label>
+                <select id="year" name="year">
+                    <option value="">ทุกปี</option>
+                    @foreach ($yearOptions as $year)
+                        <option value="{{ $year['value'] }}" @selected((string) $year['value'] === (string) $filters['year'])>{{ $year['label'] }}</option>
+                    @endforeach
+                </select>
             </div>
             <div>
                 <label for="month">เดือน</label>
                 <select id="month" name="month">
                     <option value="">ทุกเดือน</option>
-                    @foreach (range(1, 12) as $month)
-                        <option value="{{ $month }}" @selected((string) $month === (string) $filters['month'])>{{ $month }}</option>
+                    @foreach ($monthOptions as $month)
+                        <option value="{{ $month['value'] }}" @selected((string) $month['value'] === (string) $filters['month'])>{{ $month['label'] }}</option>
                     @endforeach
                 </select>
             </div>
@@ -79,7 +84,7 @@
                         <p class="course-type">{{ $session['course_type'] }}</p>
                         <h3><a href="{{ route('course-catalog.detail', $session['code']) }}">{{ $session['title'] }}</a></h3>
                         <dl class="fact-list">
-                            <div><dt>วันที่</dt><dd><time datetime="{{ $session['starts_on'] }}">{{ $session['starts_on'] }}</time> – <time datetime="{{ $session['ends_on'] }}">{{ $session['ends_on'] }}</time></dd></div>
+                            <div><dt>วันที่</dt><dd><time datetime="{{ $session['starts_on'] }}">{{ $displayDates[$session['code']]['starts_on'] }}</time> – <time datetime="{{ $session['ends_on'] }}">{{ $displayDates[$session['code']]['ends_on'] }}</time></dd></div>
                             <div><dt>ศูนย์</dt><dd>{{ $session['center'] }}</dd></div>
                             <div><dt>สถานะ</dt><dd>{{ ['open' => 'เปิดรับสมัคร', 'upcoming' => 'ยังไม่เปิดรับสมัคร', 'closed' => 'ปิดรับสมัครแล้ว'][$session['registration_status']] }}</dd></div>
                         </dl>

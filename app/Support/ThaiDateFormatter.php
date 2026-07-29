@@ -53,13 +53,23 @@ final class ThaiDateFormatter
         );
     }
 
+    public function buddhistYear(int $gregorianYear): int
+    {
+        return $gregorianYear + 543;
+    }
+
+    public function monthName(int $month): string
+    {
+        return self::MONTHS[$month] ?? 'เดือนไม่ถูกต้อง';
+    }
+
     private function civilDate(CarbonImmutable $date): string
     {
         return sprintf(
             '%d %s %d',
             $date->day,
-            self::MONTHS[$date->month],
-            $date->year + 543,
+            $this->monthName($date->month),
+            $this->buddhistYear($date->year),
         );
     }
 }

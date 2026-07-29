@@ -25,5 +25,7 @@ final class ThaiDateFormatterTest extends TestCase
             '10 สิงหาคม 2569',
             $formatter->date('2026-08-10', 'Asia/Bangkok'),
         );
+        self::assertSame(2569, $formatter->buddhistYear(2026));
+        self::assertSame('สิงหาคม', $formatter->monthName(8));
     }
 }

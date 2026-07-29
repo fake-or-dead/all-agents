@@ -5,14 +5,27 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Modules\CourseCatalog\Contracts\CourseCatalog;
 use App\Modules\CourseCatalog\Data\CourseSearch;
+use App\Support\ThaiDateFormatter;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 final class CourseCatalogController extends Controller
 {
-    public function __invoke(Request $request, CourseCatalog $catalog): View
-    {
+    public function __invoke(
+        Request $request,
+        CourseCatalog $catalog,
+        ThaiDateFormatter $dates,
+    ): View {
         $search = $this->searchFrom($request);
+        $result = $catalog->search($search);
+        $displayDates = [];
+
+        foreach ($result->sessions as $session) {
+            $displayDates[$session['code']] = [
+                'starts_on' => $dates->date($session['starts_on'], 'Asia/Bangkok'),
+                'ends_on' => $dates->date($session['ends_on'], 'Asia/Bangkok'),
+            ];
+        }
 
         return view('public.course-catalog', [
             'filters' => [
@@ -21,8 +34,23 @@ final class CourseCatalogController extends Controller
                 'course_type' => $request->query('course_type', ''),
                 'center' => $request->query('center', ''),
             ],
+            'displayDates' => $displayDates,
+            'monthOptions' => array_map(
+                static fn (int $month): array => [
+                    'value' => $month,
+                    'label' => $dates->monthName($month),
+                ],
+                range(1, 12),
+            ),
+            'yearOptions' => array_map(
+                static fn (int $year): array => [
+                    'value' => $year,
+                    'label' => $dates->buddhistYear($year),
+                ],
+                range(2020, 2100),
+            ),
             'search' => $search,
-            'result' => $catalog->search($search),
+            'result' => $result,
         ]);
     }
 

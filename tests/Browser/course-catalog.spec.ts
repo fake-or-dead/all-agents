@@ -4,10 +4,11 @@ import { expect, test } from "@playwright/test";
 test("catalog is Thai-first, accessible, keyboard operable, and filterable", async ({
     page,
 }) => {
-    await page.goto(
+    const catalogResponse = await page.goto(
         "/course?year=2026&month=8&course_type=meditation&center=tapoda",
     );
 
+    expect(catalogResponse?.headers()["referrer-policy"]).toBe("no-referrer");
     await expect(page.locator("html")).toHaveAttribute("lang", "th");
     await expect(
         page.getByRole("heading", { level: 1, name: "ค้นหาหลักสูตร" }),
@@ -15,6 +16,13 @@ test("catalog is Thai-first, accessible, keyboard operable, and filterable", asy
     await expect(
         page.getByRole("link", { name: "หลักสูตรปฏิบัติธรรม 10 วัน" }),
     ).toBeVisible();
+    await expect(page.getByLabel("ปี พ.ศ.")).toHaveValue("2026");
+    await expect(page.getByLabel("เดือน")).toHaveValue("8");
+    await expect(page.getByLabel("เดือน").locator("option:checked")).toHaveText(
+        "สิงหาคม",
+    );
+    await expect(page.getByText("10 สิงหาคม 2569")).toBeVisible();
+    await expect(page.getByText("20 สิงหาคม 2569")).toBeVisible();
     await expect(
         page.getByRole("link", { name: "หลักสูตรเตรียมจิตอาสา" }),
     ).toHaveCount(0);
@@ -90,7 +98,16 @@ test("course detail exposes truthful policy and local document outcome", async (
     await page.getByLabel("อายุ").fill("30");
     await page.getByLabel("ประเภทบุคคล").selectOption("female");
     await page.getByLabel("รูปแบบการสมัคร").selectOption("trainee");
+    const eligibilityResponsePromise = page.waitForResponse(
+        (response) =>
+            response.request().method() === "POST" &&
+            response.url().includes("/eligibility"),
+    );
     await page.getByRole("button", { name: "ประเมินสิทธิ์" }).click();
+    const eligibilityResponse = await eligibilityResponsePromise;
+    expect(eligibilityResponse.headers()["referrer-policy"]).toBe(
+        "no-referrer",
+    );
     await expect(
         page.getByRole("heading", { level: 3, name: "ผ่านเกณฑ์เบื้องต้น" }),
     ).toBeVisible();

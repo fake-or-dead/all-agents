@@ -11,17 +11,13 @@
 		-Server
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
+		?Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), geolocation=(), microphone=()"
 		-X-Powered-By
 	}
 
-	# Referrer policies use disjoint matchers. Caddy otherwise lets the global
-	# header directive overwrite a recovery-specific policy in its response phase.
-	@non_recovery not path /recover/*
-	header @non_recovery {
-		Referrer-Policy "strict-origin-when-cross-origin"
-	}
-
+	# Recovery is always private. Other routes keep an application-supplied
+	# stricter policy; Caddy supplies strict-origin only when none is present.
 	@recovery path /recover/*
 	header @recovery {
 		Referrer-Policy "no-referrer"
