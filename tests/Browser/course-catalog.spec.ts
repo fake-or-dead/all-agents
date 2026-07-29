@@ -27,6 +27,14 @@ test("catalog is Thai-first, accessible, keyboard operable, and filterable", asy
         page.getByRole("link", { name: "หลักสูตรเตรียมจิตอาสา" }),
     ).toHaveCount(0);
     await expect(page.locator('script[type="module"]')).toHaveCount(0);
+    await page.evaluate(() => document.fonts.ready);
+    expect(
+        await page.evaluate(() => document.fonts.check("16px Sarabun")),
+    ).toBe(true);
+    await expect(page.locator("html")).toHaveCSS(
+        "font-family",
+        /Sarabun.*system-ui.*sans-serif/,
+    );
 
     const accessibility = await new AxeBuilder({ page }).analyze();
     expect(accessibility.violations).toEqual([]);
@@ -37,13 +45,32 @@ test("catalog is Thai-first, accessible, keyboard operable, and filterable", asy
     ).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.locator("#main-content")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByLabel("ปี พ.ศ.")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByLabel("เดือน")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByLabel("ประเภทหลักสูตร")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByLabel("ศูนย์")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "ค้นหา" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("link", { name: "ล้างตัวกรอง" })).toBeFocused();
 });
 
-for (const width of [320, 375, 768, 1024, 1440]) {
-    test(`catalog reflows without horizontal overflow at ${width}px`, async ({
+for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1185, height: 811 },
+    { width: 1024, height: 768 },
+    { width: 768, height: 1024 },
+    { width: 375, height: 812 },
+    { width: 320, height: 568 },
+]) {
+    test(`catalog reflows without horizontal overflow at ${viewport.width}x${viewport.height}`, async ({
         page,
     }) => {
-        await page.setViewportSize({ width, height: 900 });
+        await page.setViewportSize(viewport);
         await page.goto("/course");
 
         expect(
@@ -53,6 +80,101 @@ for (const width of [320, 375, 768, 1024, 1440]) {
                     document.documentElement.clientWidth,
             ),
         ).toBe(true);
+
+        if (viewport.width >= 768) {
+            const cards = await page
+                .locator(".course-card")
+                .evaluateAll((elements) =>
+                    elements.map(
+                        (element) => element.getBoundingClientRect().bottom,
+                    ),
+                );
+
+            expect(cards).not.toHaveLength(0);
+            expect(cards.every((bottom) => bottom <= viewport.height)).toBe(
+                true,
+            );
+        }
+    });
+}
+
+for (const viewport of [
+    { name: "desktop", width: 1440, height: 900 },
+    { name: "mobile", width: 375, height: 812 },
+]) {
+    test(`catalog cards stay fully bounded at the ${viewport.name} viewport`, async ({
+        page,
+    }) => {
+        await page.setViewportSize(viewport);
+        await page.goto("/course?year=2026");
+
+        const layout = await page.locator(".course-card").evaluateAll((cards) =>
+            cards.map((card) => {
+                const cardRect = card.getBoundingClientRect();
+                const descendants = [...card.querySelectorAll("*")].map(
+                    (element) => element.getBoundingClientRect(),
+                );
+
+                return {
+                    left: cardRect.left,
+                    right: cardRect.right,
+                    bottom: cardRect.bottom,
+                    contentIsBounded: descendants.every(
+                        (rect) =>
+                            rect.left >= cardRect.left - 1 &&
+                            rect.right <= cardRect.right + 1 &&
+                            rect.top >= cardRect.top - 1 &&
+                            rect.bottom <= cardRect.bottom + 1,
+                    ),
+                };
+            }),
+        );
+
+        expect(layout).not.toHaveLength(0);
+        expect(
+            layout.every(
+                (card) =>
+                    card.left >= 0 &&
+                    card.right <= viewport.width &&
+                    card.contentIsBounded,
+            ),
+        ).toBe(true);
+        const targetHeights = await page
+            .locator(
+                ".filter-panel select, .filter-panel button, .filter-panel .secondary-action",
+            )
+            .evaluateAll((elements) =>
+                elements.map(
+                    (element) => element.getBoundingClientRect().height,
+                ),
+            );
+        expect(targetHeights.every((height) => height >= 44)).toBe(true);
+
+        if (viewport.name === "desktop") {
+            expect(layout.every((card) => card.bottom <= viewport.height)).toBe(
+                true,
+            );
+
+            const visualScale = await page.evaluate(() => {
+                const heading = document.querySelector("h1");
+                const filter = document.querySelector(".filter-panel");
+
+                if (!(heading instanceof HTMLElement) || !filter) {
+                    return null;
+                }
+
+                return {
+                    headingFontSize: Number.parseFloat(
+                        getComputedStyle(heading).fontSize,
+                    ),
+                    filterHeight: filter.getBoundingClientRect().height,
+                };
+            });
+
+            expect(visualScale).not.toBeNull();
+            expect(visualScale?.headingFontSize).toBeLessThanOrEqual(36);
+            expect(visualScale?.filterHeight).toBeLessThanOrEqual(180);
+        }
     });
 }
 

@@ -8,7 +8,7 @@
         <title>{{ $__env->yieldContent('title', 'หลักสูตรตโปทาราม') }}</title>
         @vite(['resources/css/app.css'])
     </head>
-    <body>
+    <body class="@yield('body-class')">
         <a class="skip-link" href="#main-content">ข้ามไปยังเนื้อหาหลัก</a>
         <header class="site-header">
             <div class="header-inner">

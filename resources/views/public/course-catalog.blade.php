@@ -2,6 +2,7 @@
 
 @section('title', 'ค้นหาหลักสูตร | ตโปทาราม')
 @section('description', 'ค้นหาหลักสูตรตามปี เดือน ประเภท และศูนย์ พร้อมลิงก์ผลลัพธ์ที่แชร์ได้')
+@section('body-class', 'course-catalog-page')
 
 @section('content')
     <section class="hero">
