@@ -184,6 +184,26 @@ previous status under a new timestamp.
 - Ephemeral test containers are allowed only one at a time with `--rm` against
   the reused services. Keep the normal Playwright timeout; infrastructure delay
   must be diagnosed rather than hidden by a longer timeout.
+- A fully specified packet is not necessarily a PR-sized task. Keep one
+  umbrella Issue for the complete user outcome, but split implementation before
+  assignment when it contains more than one principal state machine/owner or
+  cannot reasonably reach review within 60–90 minutes. Each child has one
+  independently mergeable outcome, explicit predecessor SHA, focused
+  acceptance, and exact-SHA review; the umbrella closes only after the complete
+  journey and integrated release pass.
+- Focused browser success does not prove the configured full-suite contract.
+  Final evidence must run the repository command with its real worker setting.
+  Any test sharing PostgreSQL rows, Redis buckets, fixture identities, or rate
+  limits must be serial, or must prove unique isolated state.
+- Browser fixture provisioning is part of the deployed test contract. A local
+  environment variable or ad hoc seeder invocation is not enough when GitHub CI
+  uses another bootstrap path. Assert fixture/API readiness at the request
+  boundary before selecting dependent UI options, so missing data or HTTP
+  failure is reported directly rather than as a later timeout.
+- Every retryable create command needs persisted actor-scoped idempotency in the
+  same transaction as the domain mutation and audit. Same key plus same payload
+  returns the original result; same key plus different payload conflicts;
+  concurrent or ambiguous-response replay produces one mutation and one audit.
 
 ## Definition of Done
 

@@ -204,3 +204,54 @@ Every active delivery hour records:
   pre/post-gate inventory and cleanup. Direct PostgreSQL-container exec probes
   are prohibited; reset, seed, readiness, warmup, and browser work run
   serially.
+
+### 2026-07-29 18:07 +07
+
+- Checkpoint discipline: recorded at the fixed `18:07` boundary before
+  resuming CI or agent monitoring. This corrects the late `17:07` process
+  failure.
+- Output: PR #48 replacement `e4ce03c` passed exact local frontend, Browser 6/6,
+  backend 93 tests / 693 assertions, Pint, PHPStan, and architecture gates.
+  GitHub backend/frontend/secrets passed, but the authoritative full browser
+  job failed with 26 passed, 1 failed, and 5 not run. PR #49 PM documentation
+  passed CI 4/4 and remains held behind #48.
+- Review output: exact-SHA security review found two Mediums. Password negative
+  flows discarded the useful Thai Identity message and lacked
+  secret-redaction/session-invariance proof. Training creation lacked persisted
+  idempotency, so an ambiguous committed response followed by retry could
+  duplicate the training row and audit.
+- Integration failure: the Member browser fixture was provisioned only when a
+  local container environment variable existed. GitHub CI did not seed it, so
+  the first test never found `member-bkk`; retries then reused the shared
+  verification limiter and returned HTTP 429. The full configuration also ran
+  state-sharing tests with two workers despite the serial-runtime rule.
+- Change in progress: the password RED now passes with 1 test / 41 assertions.
+  Sequential training replay/conflict/scope RED now passes with 1 test / 15
+  assertions using a People-owned same-transaction idempotency claim. Remaining
+  proof is real PostgreSQL concurrency, negative/ambiguous browser coverage,
+  deterministic CI fixture provisioning, the configured-worker full browser
+  suite, and all final gates.
+- Task-sizing failure: #12 and the prepared #13 packet each combined multiple
+  state machines and owners. Review of Issues #14–#32 found all 19 exceed the
+  60–90 minute PR-sized rule; packets span 13,053–37,683 characters and often
+  4–17 routes. Large task packets reduced ambiguity but did not reduce WIP or
+  replacement-SHA blast radius.
+- Change applied: #13 remains the acceptance umbrella and is split into child
+  Issues #50–#54 for Form Engine, start/resume, autosave, atomic submit, and
+  receipt/timeline. Future umbrella Issues are decomposed just in time before
+  coding. Issue #30 is explicitly XL with six local child slices; Issue #31 is
+  explicitly XL with five local rehearsal slices and excludes actual production
+  cutover.
+- Docker result: 18 stale Compose projects and four one-shot containers were
+  removed without deleting volumes. Only `tapoda-next` and one current
+  `tapoda-issue12-browser` candidate project remain for this rebuild. Host load
+  recovered from `34.75` to `9.05`; current PostgreSQL/Redis services remain
+  reused and healthy.
+- Delivery result: #12 is not approved or ready to merge. Review and the full
+  CI gate found real correctness/evidence defects after focused local success.
+  No false release was made; `localhost:8080` remains the last approved main
+  slice.
+- Next-hour target: finish one #12 replacement batch, pass the configured full
+  browser plus backend/static gates, push once, obtain CI 4/4 and fresh dual
+  reciprocal exact-SHA review, merge #48, then release Member Center to
+  `main`/`:8080` and activate child #50.
