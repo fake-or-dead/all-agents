@@ -186,6 +186,67 @@ final class ArchitectureBoundariesTest extends TestCase
         );
     }
 
+    public function test_form_engine_cannot_import_another_modules_infrastructure(): void
+    {
+        $root = $this->fixtureRoot();
+        $this->createExpectedModules($root);
+        file_put_contents(
+            "{$root}/FormEngine/Infrastructure/Forbidden.php",
+            '<?php use App\\Modules\\DocumentsConsent\\Infrastructure\\DatabaseConsentAcceptanceService;',
+        );
+
+        $result = $this->check($root);
+
+        self::assertSame(1, $result['exitCode']);
+        self::assertStringContainsString(
+            'FormEngine/Infrastructure/Forbidden.php imports forbidden module DocumentsConsent',
+            $result['output'],
+        );
+    }
+
+    public function test_other_modules_cannot_read_form_engine_owned_tables(): void
+    {
+        $root = $this->fixtureRoot();
+        $this->createExpectedModules($root);
+        file_put_contents(
+            "{$root}/ApplicationWorkflow/Infrastructure/Forbidden.php",
+            "<?php DB::table('form_versions')->first();",
+        );
+
+        $result = $this->check($root);
+
+        self::assertSame(1, $result['exitCode']);
+        self::assertStringContainsString(
+            'accesses FormEngine-owned table form_versions',
+            $result['output'],
+        );
+    }
+
+    public function test_form_engine_cannot_read_other_owner_tables(): void
+    {
+        foreach ([
+            'course_sessions' => 'CourseCatalog',
+            'people' => 'People',
+            'consent_document_versions' => 'DocumentsConsent',
+            'application_workflow_facts' => 'ApplicationWorkflow',
+        ] as $table => $owner) {
+            $root = $this->fixtureRoot();
+            $this->createExpectedModules($root);
+            file_put_contents(
+                "{$root}/FormEngine/Infrastructure/Forbidden.php",
+                "<?php DB::table('{$table}')->first();",
+            );
+
+            $result = $this->check($root);
+
+            self::assertSame(1, $result['exitCode']);
+            self::assertStringContainsString(
+                "accesses {$owner}-owned table {$table}",
+                $result['output'],
+            );
+        }
+    }
+
     private function fixtureRoot(): string
     {
         $root = sys_get_temp_dir().'/tapoda-architecture-'.bin2hex(random_bytes(6));
@@ -201,6 +262,7 @@ final class ArchitectureBoundariesTest extends TestCase
             'Audit',
             'CourseCatalog',
             'DocumentsConsent',
+            'FormEngine',
             'IdentityAccess',
             'People',
             'PlatformOperations',

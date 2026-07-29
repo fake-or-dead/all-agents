@@ -75,10 +75,15 @@ final class LocalSeedTest extends TestCase
         $this->assertSame($account->id, $credential->account_id);
         $this->assertTrue(Hash::check('TapodaLocalSeed!2026', $credential->password_hash));
 
-        $this->assertDatabaseCount('consent_documents', 1);
+        $this->assertDatabaseCount('consent_documents', 2);
         $this->assertDatabaseHas('consent_document_versions', [
             'id' => '10000000-0000-4000-8000-000000000002',
             'version_label' => 'local-fixture-v1',
+        ]);
+        $this->assertDatabaseHas('consent_document_versions', [
+            'id' => '30000000-0000-4000-8000-000000000002',
+            'version_label' => 'local-application-v1',
+            'status' => 'published',
         ]);
         $this->assertDatabaseCount('consent_acceptances', 0);
     }
