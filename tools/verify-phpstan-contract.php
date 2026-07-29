@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-$expectedCommand = 'exec php -d memory_limit=1G vendor/bin/phpstan analyse --memory-limit=1G';
+$expectedCommand = 'exec php -d memory_limit=1G vendor/bin/phpstan analyse --memory-limit=1G "$@"';
 $expectedScript = "#!/bin/sh\n\nset -eu\n\n{$expectedCommand}\n";
 $files = [
     'bin/phpstan' => $expectedScript,

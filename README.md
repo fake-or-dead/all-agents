@@ -39,6 +39,7 @@ PHPStan always runs through `bin/phpstan`: `php -d memory_limit=1G` sets the PHP
 process and parallel-worker limit, while `--memory-limit=1G` sets PHPStan's own
 limit. The 1G bound is deliberate: the full `app` analysis exhausted the image's
 default 128M worker limit, and completed with this bound. The wrapper uses `exec`,
-so an analysis failure remains a failing local or CI gate.
+so an analysis failure remains a failing local or CI gate. Extra arguments are
+forwarded unchanged, for example `bin/phpstan --error-format=table app`.
 
 See [platform operations](docs/runbooks/platform-operations.md) for deploy, monitoring, rollback, and restore procedures.
