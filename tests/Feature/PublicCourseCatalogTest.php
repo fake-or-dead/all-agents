@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\RequireActiveAccountSession;
 use App\Models\Account;
+use App\Modules\IdentityAccess\Contracts\ApplicantIdentityResolver;
 use Database\Seeders\CourseCatalogSeeder;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -125,81 +129,88 @@ final class PublicCourseCatalogTest extends TestCase
     {
         $this->travelTo('2026-07-29 12:00:00');
 
-        $ownerAccountId = '11111111-1111-4111-8111-111111111111';
-        $otherAccountId = '22222222-2222-4222-8222-222222222222';
-        $inactiveAccountId = '33333333-3333-4333-8333-333333333333';
-        $adminAccountId = '44444444-4444-4444-8444-444444444444';
-        $ownerPersonId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-        $otherPersonId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+        $owner = $this->registerAccount(
+            'owner-course@example.test',
+            'OWNER123',
+        );
+        $ownerAccountId = (string) $owner->getAuthIdentifier();
+        $ownerPersonId = (string) $owner->getAttribute('person_id');
         DB::table('application_workflow_facts')->insert([
             'course_session_id' => '10000000-0000-4000-8000-000000000001',
             'person_id' => $ownerPersonId,
             'state' => 'submitted',
         ]);
-        DB::table('applicant_account_ownerships')->insert([
-            [
-                'account_id' => $ownerAccountId,
-                'person_id' => $ownerPersonId,
-                'account_status' => 'active',
-                'identity_role' => 'applicant',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'account_id' => $otherAccountId,
-                'person_id' => $otherPersonId,
-                'account_status' => 'active',
-                'identity_role' => 'applicant',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'account_id' => $inactiveAccountId,
-                'person_id' => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-                'account_status' => 'inactive',
-                'identity_role' => 'applicant',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'account_id' => $adminAccountId,
-                'person_id' => 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-                'account_status' => 'active',
-                'identity_role' => 'administrator',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
 
         $this
-            ->actingAs(new Account(['id' => $ownerAccountId]))
+            ->actingAs($owner)
             ->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
             ->assertOk()
             ->assertSee('existing-application')
             ->assertSee('มีใบสมัครสำหรับรอบนี้อยู่แล้ว');
 
+        $other = $this->registerAccount(
+            'other-course@example.test',
+            'OTHER456',
+        );
         $this
-            ->actingAs(new Account(['id' => $otherAccountId]))
+            ->actingAs($other)
             ->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
             ->assertOk()
-            ->assertSee('eligible');
+            ->assertSee('<code>eligible</code>', false)
+            ->assertDontSee('existing-application');
 
+        $this->post('/signout')->assertRedirect('/signin');
         $this->app['auth']->forgetGuards();
         $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
             ->assertOk()
             ->assertSee('preliminary-eligible');
 
-        $this
-            ->actingAs(new Account(['id' => $inactiveAccountId]))
-            ->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
-            ->assertOk()
-            ->assertSee('preliminary-eligible');
+        $administrativePrincipal = new NonApplicantPrincipal;
+        $administrativePrincipal->forceFill(['id' => '44444444-4444-4444-8444-444444444444']);
+        $administrativeRequest = Request::create('/course', 'GET');
+        $administrativeRequest->setUserResolver(
+            static fn (): NonApplicantPrincipal => $administrativePrincipal,
+        );
+        self::assertNull(
+            $this->app
+                ->make(ApplicantIdentityResolver::class)
+                ->resolve($administrativeRequest),
+        );
 
+        $staleAuthenticatedOwner = Account::query()->findOrFail($ownerAccountId);
+        $staleOwnerRequest = Request::create('/course', 'GET');
+        $staleOwnerRequest->setUserResolver(
+            static fn (): Account => $staleAuthenticatedOwner,
+        );
+        $identityResolver = $this->app->make(ApplicantIdentityResolver::class);
+        self::assertSame(
+            $ownerPersonId,
+            $identityResolver->resolve($staleOwnerRequest)?->personId,
+        );
+        DB::table('accounts')->where('id', $ownerAccountId)->update([
+            'status' => 'inactive',
+            'updated_at' => now(),
+        ]);
+        self::assertNull($identityResolver->resolve($staleOwnerRequest));
+
+        // The account-session middleware independently revokes inactive sessions.
+        // Bypass only that outer guard to prove Course Catalog itself fails closed
+        // if a stale framework principal reaches the production resolver.
+        $this->withoutMiddleware(RequireActiveAccountSession::class);
         $this
-            ->actingAs(new Account(['id' => $adminAccountId]))
+            ->actingAs($staleAuthenticatedOwner)
             ->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
             ->assertOk()
-            ->assertSee('preliminary-eligible');
+            ->assertSee('preliminary-eligible')
+            ->assertDontSee('existing-application');
+
+        DB::table('accounts')->where('id', $ownerAccountId)->update([
+            'status' => 'active',
+            'updated_at' => now(),
+        ]);
+        $this->post('/course/detail/D10-2026-08-TAPODA/eligibility', $this->eligibleInput())
+            ->assertOk()
+            ->assertSee('existing-application');
     }
 
     public function test_eligibility_post_keeps_sensitive_inputs_out_of_url_and_private_caches(): void
@@ -401,4 +412,31 @@ final class PublicCourseCatalogTest extends TestCase
     {
         return ['age' => '30', 'category' => 'female', 'applicant_type' => 'trainee'];
     }
+
+    private function registerAccount(string $email, string $passport): Account
+    {
+        $this->postJson('/auth/verification/request', ['email' => $email])
+            ->assertAccepted();
+        $registrationToken = $this->postJson('/auth/verification/verify', [
+            'email' => $email,
+            'code' => '246810',
+        ])->assertOk()->json('registration_token');
+
+        $this->postJson('/signup', [
+            'email' => $email,
+            'registration_token' => $registrationToken,
+            'identity_type' => 'passport',
+            'identity_number' => $passport,
+            'given_name' => 'ผู้สมัคร',
+            'family_name' => 'ทดสอบ',
+            'password' => 'safe-password-123',
+            'password_confirmation' => 'safe-password-123',
+            'consent_accepted' => true,
+            'consent_version' => '10000000-0000-4000-8000-000000000002',
+        ])->assertCreated();
+
+        return Account::query()->findOrFail((string) auth()->id());
+    }
 }
+
+final class NonApplicantPrincipal extends Authenticatable {}

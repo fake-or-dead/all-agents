@@ -8,10 +8,6 @@ use App\Modules\CourseCatalog\Contracts\CourseCatalog;
 use App\Modules\CourseCatalog\Infrastructure\Persistence\DatabaseCourseCatalog;
 use App\Modules\DocumentsConsent\Contracts\PublicCourseDocuments;
 use App\Modules\DocumentsConsent\Infrastructure\Persistence\DatabasePublicCourseDocuments;
-use App\Modules\IdentityAccess\Contracts\ApplicantIdentityResolver;
-use App\Modules\IdentityAccess\Contracts\ApplicantOwnershipDirectory;
-use App\Modules\IdentityAccess\Infrastructure\DatabaseApplicantOwnershipDirectory;
-use App\Modules\IdentityAccess\Infrastructure\LaravelApplicantIdentityResolver;
 use App\Modules\ReferenceData\Contracts\ReferenceData;
 use App\Modules\ReferenceData\Infrastructure\Persistence\DatabaseReferenceData;
 use Illuminate\Support\ServiceProvider;
@@ -22,8 +18,6 @@ final class CourseCatalogServiceProvider extends ServiceProvider
     {
         $this->app->bind(ApplicationFacts::class, DatabaseApplicationFacts::class);
         $this->app->bind(PublicCourseDocuments::class, DatabasePublicCourseDocuments::class);
-        $this->app->bind(ApplicantIdentityResolver::class, LaravelApplicantIdentityResolver::class);
-        $this->app->bind(ApplicantOwnershipDirectory::class, DatabaseApplicantOwnershipDirectory::class);
         $this->app->bind(CourseCatalog::class, DatabaseCourseCatalog::class);
         $this->app->bind(ReferenceData::class, DatabaseReferenceData::class);
     }
