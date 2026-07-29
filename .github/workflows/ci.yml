@@ -89,9 +89,10 @@ jobs:
           bin/build-artifact ci "${GITHUB_SHA}"
           echo "TAPODA_APP_IMAGE=$(docker image inspect --format '{{.Id}}' tapoda-next:ci)" >> "${GITHUB_ENV}"
       - run: docker compose up -d --wait --wait-timeout 60 postgres redis
-      - run: docker compose --profile tools up --no-deps --abort-on-container-exit --exit-code-from migrate migrate
+      - name: Fresh PostgreSQL local seed gate
+        run: docker compose --profile tools up --no-deps --abort-on-container-exit --exit-code-from seed seed
       - run: docker compose up -d web worker scheduler
-      - run: bin/assert-runtime-artifact ci "${GITHUB_SHA}" migrate web worker scheduler
+      - run: bin/assert-runtime-artifact ci "${GITHUB_SHA}" seed web worker scheduler
       - name: Wait for bounded application readiness
         run: bin/smoke http://127.0.0.1:8080
         env:

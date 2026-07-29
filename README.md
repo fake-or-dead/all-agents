@@ -13,15 +13,27 @@ export APP_BUILD_COMMIT="$(git rev-parse HEAD)"
 bin/build-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT"
 export TAPODA_APP_IMAGE="$(docker image inspect --format '{{.Id}}' "tapoda-next:${APP_BUILD_VERSION}")"
 docker compose up -d --wait --wait-timeout 60 postgres redis
-docker compose --profile tools up --no-deps --abort-on-container-exit --exit-code-from migrate migrate
+docker compose --profile tools up --no-deps --abort-on-container-exit --exit-code-from seed seed
 docker compose up -d web worker scheduler
-bin/assert-runtime-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT" migrate web worker scheduler
+bin/assert-runtime-artifact "$APP_BUILD_VERSION" "$APP_BUILD_COMMIT" seed web worker scheduler
 SMOKE_OVERALL_TIMEOUT_SECONDS=60 \
 SMOKE_CONNECT_TIMEOUT_SECONDS=2 \
 SMOKE_REQUEST_TIMEOUT_SECONDS=5 \
 SMOKE_RETRY_INTERVAL_SECONDS=1 \
 bin/smoke http://127.0.0.1:8080
 ```
+
+The local fixture reset is exactly `php artisan migrate:fresh --seed --force`.
+After `postgres` and `redis` are healthy, run it through the reviewed local
+artifact with:
+
+```sh
+docker compose --profile tools run --rm --no-deps seed php artisan migrate:fresh --seed --force
+```
+
+It destroys only the local Compose PostgreSQL database, then creates the
+deterministic internal IdentityAccess fixture. Consent document/version fixtures
+remain migration-owned; no production data or external adapters are used.
 
 The smoke gate polls liveness, readiness, the Thai home page, and verifies that a non-secret recovery-token path returns `Referrer-Policy: no-referrer` plus `Cache-Control: no-store`. Every request has a two-second connection timeout and five-second response timeout. Failure reports the endpoint, attempts, HTTP/curl result, and response size without printing response content. Open <http://127.0.0.1:8080>. Stop with `docker compose stop`.
 

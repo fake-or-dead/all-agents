@@ -93,6 +93,14 @@ services:
     healthcheck:
       disable: true
 
+  seed:
+    <<: *app
+    profiles: ["tools"]
+    command: ["php", "artisan", "migrate:fresh", "--seed", "--force"]
+    restart: "no"
+    healthcheck:
+      disable: true
+
   test:
     build:
       context: .
