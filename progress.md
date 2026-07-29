@@ -81,7 +81,7 @@ and the authenticated `GET /account` returned HTTP 200.
 | Issue #12 member center | coding + dual review agents complete | Released to `main`/`:8080` at `dff85f6`; Issue #12 closed; exact artifact and authenticated URL checks pass | None | Keep regression gates |
 | Issue #13 application | PM + #50 coding/early-review agents | #50 active from exact `a878957`; four of six early findings fixed locally; #57 now tracks server-owned eligibility/persona evidence and blocks #51 | Two #50 review findings plus final gates | Deliver #50 schema/resolver slice; no routes/UI/drafts; do not assign #51 |
 | Issues #14–#32 | PM decomposition complete | #14–#29 have PR-sized decomposition comments; #30–#32 are explicit XL multi-PR local packets with production actions separated | Each waits for predecessor; child Issues created just in time | Never assign original XL packet as one batch |
-| Docker lifecycle | PM/controller | `issue36seed` stopped project removed with volume preserved; `tapoda-next` is live; only PostgreSQL/Redis of the same candidate project are leased to #50 service gates | Candidate lease held by #50 | Query active agents before teardown; inventory normal/tools profiles; down candidate only after explicit lease release |
+| Docker lifecycle | PM/controller | `issue36seed` stopped project removed with volume preserved; `tapoda-next` is live; only PostgreSQL/Redis of `tapoda-issue12-browser` are leased to the #50 coding agent's service gates | Lease owner and active consumer: #50 coding agent | Query that agent before teardown; inventory normal plus `tools`/`restore` profiles; down candidate only after explicit lease release |
 
 ## Delivery metrics
 

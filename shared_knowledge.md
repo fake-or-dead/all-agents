@@ -181,10 +181,11 @@ previous status under a new timestamp.
   infrastructure lease. PM must ask active consumers and receive an explicit
   release before teardown; record the handoff in the Issue/PR.
 - Cleanup inventory must include `docker compose ls -a`, exact project-labelled
-  containers, and every enabled tools/browser/restore profile. Normal-profile
-  `down` can leave one-shot profile containers behind. Use the exact project
-  config and relevant profiles, never `-v`, then prove project absence and
-  named-volume preservation.
+  containers, and every relevant profile from the rendered configuration. This
+  repository currently declares `tools` and `restore`; do not invent a browser
+  profile. Normal-profile `down` can leave one-shot profile containers behind.
+  Use the exact project config and relevant profiles, never `-v`, then prove
+  project absence and named-volume preservation.
 - Do not run probes, resets, or test clients with `docker exec` inside the
   PostgreSQL container. PostgreSQL 18 treats an abnormal untracked child exit as
   unsafe and can terminate all backends for crash recovery. Use a separate
