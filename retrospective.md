@@ -50,6 +50,10 @@ testing, review, or runtime problem changes the plan.
   presents from `progress.md` instead of reconstructing status on demand.
 - Every new repeated failure becomes a shared standard or task-packet rule so
   the next coding agent does not repay the same learning cost.
+- The first `progress.md` draft copied a stale PR #34 pending state even though
+  exact browser CI had already failed. A dashboard timestamp is not evidence.
+  The PM must refresh Issues, PR heads, CI, reviews, agents, and runtimes before
+  every dashboard commit or presentation.
 
 ## Hourly checkpoints
 

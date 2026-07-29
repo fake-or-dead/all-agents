@@ -50,6 +50,18 @@ The assigned agent posts its own GitHub Issue progress comment at:
 Behavior concerns go on the PR before code changes. Delivery progress goes on the
 Issue. The PM closes Issues and merges PRs only after evidence is complete.
 
+## PM state refresh contract
+
+Before committing or presenting `progress.md`, the PM refreshes:
+
+- GitHub Issue open/closed counts and active issue comments;
+- every active PR head SHA, CI result, review state, and mergeability;
+- active agent state and exact local candidate SHA;
+- user-visible and candidate Docker runtime readiness.
+
+Record concrete failing run/job IDs and the next owner/gate. Never copy a
+previous status under a new timestamp.
+
 ## Release and review standard
 
 - Branches target `integration/local-complete` while a slice is under
