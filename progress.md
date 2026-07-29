@@ -1,6 +1,6 @@
 # Delivery Progress
 
-Last updated: 2026-07-29 14:36 +07
+Last updated: 2026-07-29 14:44 +07
 
 Owner: PM/controller. This is the presentation-ready delivery dashboard. Update
 at each merge, blocker, replacement SHA, runtime change, and hourly checkpoint.
@@ -44,8 +44,10 @@ Issue #36 reserves this local-only candidate account:
 - Password: `TapodaLocalSeed!2026`
 - Recovery email: `local-seed-account@tapoda.test`
 
-These credentials are not usable on `localhost:8080` until Issue #36 passes
-rebase, fresh seed/sign-in verification, PR review, merge, and runtime rebuild.
+PR #42 exact head `478a5a734fb7ccec9a0e835dbcd1076b104091a3`
+passed a fresh isolated PostgreSQL seed, readiness/smoke, and real HTTP sign-in
+to `/account`. These credentials are not usable on `localhost:8080` until the
+PR passes CI, dual review, merge, and runtime rebuild.
 Course Catalog is merged to integration but its URLs are not listed as live
 until the next `main` release and `localhost:8080` rebuild.
 
@@ -57,7 +59,7 @@ until the next `main` release and `localhost:8080` rebuild.
 | 2 | PM operating system | Delivered | PR #40 merge `9749eaec`, reviewed `daf9cd9`, CI 4/4, dual reciprocal PASS | Keep dashboard authoritative |
 | 3 | Course Catalog canonical ownership | Delivered to integration; Issue #10 closed | PR #34 merge `e675535`, reviewed `0eb7fe2`, CI `30431450234` 4/4, Browser 26/26, dual reciprocal PASS | Include in next `main` release and rebuild `:8080` |
 | 4 | Deterministic PHPStan memory gate | Delivered to integration | PR #38 merge `762ff4c`, reviewed `c62ae43`, CI 4/4, dual reciprocal PASS | Include in next `main` release |
-| 5 | Safe canonical local seed | Rebased candidate under fresh local verification | Issue #36; exact SHA remains unpublished until current gates pass | Push exact candidate, PR, CI, dual review |
+| 5 | Safe canonical local seed | PR open; CI running | PR #42 `478a5a7`; fresh isolated PostgreSQL seed and real HTTP sign-in pass | CI, dual review, merge |
 | 6 | Profile/application security | Not started | Issue #12 | Start after #34 schema lands |
 
 ## Active workstreams
@@ -67,7 +69,7 @@ until the next `main` release and `localhost:8080` rebuild.
 | Release control | PM/controller | PR #39 and PR #40 merged to `main`; exact release live on `:8080` | None | Release Course Catalog when green |
 | PM operating system | PM/controller | Delivered and active | None | Refresh dashboard at every phase boundary |
 | Course Catalog | coding + dual review agents complete | PR #34 merged at `e675535`; Issue #10 closed | Not yet released to `main`/`:8080` | Ship next small release |
-| Local seed | coding agent | Rebase/test from PR #34 integration is active; guarded credentials documented above | PR not created | Fresh PostgreSQL seed/sign-in proof, then publish Issue #36 branch |
+| Local seed | coding agent complete; reviewers next | PR #42 exact `478a5a7`; guarded credentials and fresh sign-in proof documented above | CI/review pending | Exact-SHA dual reciprocal review after CI |
 | PHPStan gate | coding/review agents complete | PR #38 merged at `762ff4c`; Issue #37 closed | None | Ship with next release |
 | Issue #12 member center | queued coding agent | Implementation task packet posted at Issue comment `5114102073` | Start condition satisfied by PR #34 merge | Branch from integration `e675535` after release branch isolation |
 
