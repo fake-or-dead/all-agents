@@ -53,4 +53,7 @@ Every active delivery hour records:
 - Bottleneck: PR #35 remains the merge dependency for PR #34 and the visible integration runtime.
 - Loop found: the first atomic rate-limit fix locked the combined client/identifier/pair key set. Requests sharing only a client or only an identifier could use different locks and still race on a shared bucket.
 - Change applied: rejected the candidate before push. Required an action-scoped lock or correctly ordered per-bucket/Lua atomic operation plus parallel tests across changing identifiers and changing IPs.
+- Test-environment problem found: PHPUnit forced `CACHE_STORE=array`, so an initial forked concurrency test appeared green without sharing counters. The test now explicitly selects Compose Redis, clears inherited facades/sockets in every child, and proves only one callback crosses an overlapping client-bucket ceiling.
+- Acceptance problem found: full-document axe testing exposed `.button-secondary:hover` contrast at 1.43. Main-only axe checks had hidden this header/navigation state. The shared style was corrected and the full-document matrix retained.
+- Test-design problem found: one long keyboard-only journey was brittle and obscured the failing screen. It was split into deterministic keyboard input/Enter journeys per screen with explicit state assertions.
 - Next-hour target: integrate both PR #35 commits, pass focused and full local gates, and produce one replacement SHA ready for dual exact-SHA review.
