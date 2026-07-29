@@ -1,6 +1,6 @@
 # Delivery Progress
 
-Last updated: 2026-07-29 13:12 +07
+Last updated: 2026-07-29 13:36 +07
 
 Owner: PM/controller. This is the presentation-ready delivery dashboard. Update
 at each merge, blocker, replacement SHA, runtime change, and hourly checkpoint.
@@ -47,8 +47,8 @@ browser CI, dual review, merge, and the `localhost:8080` rebuild.
 | --- | --- | --- | --- | --- |
 | 1 | Foundation + Account to `main`; remove `.scratch/tapoda-rebuild/` | Delivered | PR #39 merge `8169f11`, reviewed `71bf9af`, CI 4/4, dual reciprocal PASS | Keep as release baseline |
 | 2 | PM operating system | Delivered | PR #40 merge `9749eaec`, reviewed `daf9cd9`, CI 4/4, dual reciprocal PASS | Keep dashboard authoritative |
-| 3 | Course Catalog canonical ownership | CI browser failed; coding fix queued | PR #34 `c7f0da0`; run `30425893895`, job `90492189747`; auth signup 5% and catalog 1% Linux snapshot mismatch | Reproduce exact CI merge, inspect both diffs, run full 26-test browser suite, push replacement |
-| 4 | Deterministic PHPStan memory gate | Draft PR; CI green | PR #38, `af4f6ff`, CI 4/4 | Dual review, merge |
+| 3 | Course Catalog canonical ownership | CSS root cause fixed locally; clean full-suite rerun required | PR #34 `c7f0da0`; global Catalog controls caused Auth height regression; first full run also exposed a 1.2-second proof-expiry fixture race and stale test-container snapshot | Make timing deterministic, rebuild exact source container, pass 26/26, push replacement |
+| 4 | Deterministic PHPStan memory gate | Delivered to integration | PR #38 merge `762ff4c`, reviewed `c62ae43`, CI 4/4, dual reciprocal PASS | Include in next `main` release |
 | 5 | Safe canonical local seed | Local review fix complete | Issue #36, `8ee0b78`, full gates and seeded runtime pass | Push, PR, CI, dual review |
 | 6 | Profile/application security | Not started | Issue #12 | Start after #34 schema lands |
 
@@ -58,9 +58,10 @@ browser CI, dual review, merge, and the `localhost:8080` rebuild.
 | --- | --- | --- | --- | --- |
 | Release control | PM/controller | PR #39 and PR #40 merged to `main`; exact release live on `:8080` | None | Release Course Catalog when green |
 | PM operating system | PM/controller | Delivered and active | None | Refresh dashboard at every phase boundary |
-| Course Catalog | coding agent | Backend/frontend/secrets pass; browser failed | Two integrated Linux visual baselines do not match exact CI | Address PR comment `5113783883`, then rerun full browser CI |
+| Course Catalog | coding agent | Auth CSS regression corrected; first full integrated rerun classified | Fragile proof-expiry fixture and stale Playwright container context must be removed from final evidence | Run clean rebuilt exact-source 26-test suite |
 | Local seed | coding agent | Security guard fixed; local gates pass | PR not created | Publish issue #36 branch |
-| PHPStan gate | coding agent complete | PR #38 CI 4/4 | Reviewer capacity | Review PR #38 |
+| PHPStan gate | coding/review agents complete | PR #38 merged at `762ff4c`; Issue #37 closed | None | Ship with next release |
+| Issue #12 member center | unassigned | Implementation task packet posted at Issue comment `5114102073` | Start condition is PR #34 merge | Branch from resulting integration SHA |
 
 ## Delivery metrics
 
