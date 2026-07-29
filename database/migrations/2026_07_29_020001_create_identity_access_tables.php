@@ -156,6 +156,42 @@ return new class extends Migration
             'updated_at' => $now,
         ]);
 
+        // PostgreSQL is the authoritative local runtime. These guards make
+        // published consent evidence append-only even for direct SQL callers.
+        if (DB::getDriverName() === 'pgsql') {
+            // PostgreSQL functions outlive tables dropped by RefreshDatabase.
+            // Remove a stale test-schema function before installing this
+            // migration's authoritative guard.
+            DB::unprepared('DROP FUNCTION IF EXISTS protect_consent_acceptance() CASCADE');
+            DB::unprepared('DROP FUNCTION IF EXISTS protect_published_consent_version() CASCADE');
+            DB::unprepared(<<<'SQL'
+CREATE FUNCTION protect_published_consent_version() RETURNS trigger AS $$
+BEGIN
+    IF OLD.status = 'published' THEN
+        RAISE EXCEPTION 'published consent document versions are immutable';
+    END IF;
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER consent_document_versions_immutable
+BEFORE UPDATE OR DELETE ON consent_document_versions
+FOR EACH ROW EXECUTE FUNCTION protect_published_consent_version();
+SQL);
+            DB::unprepared(<<<'SQL'
+CREATE FUNCTION protect_consent_acceptance() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'consent acceptances are append-only';
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER consent_acceptances_append_only
+BEFORE UPDATE OR DELETE ON consent_acceptances
+FOR EACH ROW EXECUTE FUNCTION protect_consent_acceptance();
+SQL);
+        }
+
         Schema::create('auth_sessions', function (Blueprint $table): void {
             $table->string('id', 255)->primary();
             $table->uuid('account_id');
@@ -182,6 +218,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::unprepared('DROP FUNCTION IF EXISTS protect_consent_acceptance() CASCADE');
+            DB::unprepared('DROP FUNCTION IF EXISTS protect_published_consent_version() CASCADE');
+        }
         Schema::dropIfExists('local_verification_deliveries');
         Schema::dropIfExists('auth_sessions');
         Schema::dropIfExists('consent_acceptances');

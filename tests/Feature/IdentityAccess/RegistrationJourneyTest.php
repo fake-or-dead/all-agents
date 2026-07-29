@@ -2,11 +2,15 @@
 
 namespace Tests\Feature\IdentityAccess;
 
+use App\Modules\IdentityAccess\Application\IdentityAccessWorkflow;
+use App\Modules\IdentityAccess\Infrastructure\Verification\DeterministicFakeVerificationGateway;
 use App\Modules\People\Contracts\PersonIdentityDirectory;
 use App\Modules\People\Data\IdentityClaim;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use RuntimeException;
 use Tests\TestCase;
 
 final class RegistrationJourneyTest extends TestCase
@@ -91,6 +95,70 @@ final class RegistrationJourneyTest extends TestCase
         ], JSON_THROW_ON_ERROR);
         $this->assertStringNotContainsString('1234567890123', $databaseText);
         $this->assertStringNotContainsString('owner@example.test', mb_strtolower($databaseText));
+    }
+
+    public function test_recovery_epoch_bump_rejects_a_delayed_registration_session_on_postgres(): void
+    {
+        $this->assertSame('pgsql', DB::connection()->getDriverName());
+        $email = 'delayed-session@example.test';
+        $registrationToken = $this->verifiedRegistrationToken($email);
+        $workflow = $this->app->make(IdentityAccessWorkflow::class);
+
+        // This commits registration first, exactly before the controller's
+        // subsequent session-ledger write / framework Auth::login sequence.
+        $registration = $workflow->register([
+            'email' => $email,
+            'registration_token' => $registrationToken,
+            'identity_type' => 'passport',
+            'identity_number' => 'DELAY123',
+            'given_name' => 'Late',
+            'family_name' => 'Session',
+            'password' => 'safe-password-123',
+            'password_confirmation' => 'safe-password-123',
+            'consent_accepted' => true,
+            'consent_version' => self::CONSENT_VERSION_ID,
+        ], (string) Str::uuid());
+        $this->assertTrue($registration->successful);
+        $accountId = (string) $registration->data['account_id'];
+        $registrationEpoch = (int) $registration->data['credential_epoch'];
+        $this->assertSame(1, $registrationEpoch);
+
+        // A recovery commits a newer credential epoch while registration's
+        // framework session issuance is deliberately delayed.
+        $this->postJson('/forgot', ['email' => $email])->assertAccepted();
+        $path = $this->app
+            ->make(DeterministicFakeVerificationGateway::class)
+            ->latestRecoveryPathFor($email);
+        $this->assertNotNull($path);
+        $this->postJson('/recover/'.basename($path), [
+            'password' => 'recovered-password-456',
+            'password_confirmation' => 'recovered-password-456',
+        ])->assertOk();
+        $this->assertSame(2, (int) DB::table('accounts')
+            ->where('id', $accountId)
+            ->value('credential_epoch'));
+
+        // recordAuthenticatedSession() locks the PostgreSQL account row and
+        // rechecks the expected epoch inside that transaction. It fails before
+        // the controller can execute Auth::login().
+        try {
+            $workflow->recordAuthenticatedSession(
+                $accountId,
+                'delayed-registration-session',
+                $registrationEpoch,
+            );
+            $this->fail('Delayed registration session must be rejected after recovery.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(
+                'Credential generation changed before session issuance.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertDatabaseMissing('auth_sessions', [
+            'id' => 'delayed-registration-session',
+        ]);
+        $this->assertGuest();
     }
 
     public function test_registration_rejects_stale_consent_without_partial_account_creation(): void

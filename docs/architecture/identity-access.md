@@ -45,12 +45,11 @@ Issue #11 introduces the first account journey behind one module interface:
 
 Local and test runtime uses `DeterministicFakeVerificationGateway`. It performs
 no network request. The fixed local verification code is configured by
-`IDENTITY_DETERMINISTIC_CODE` and defaults to `246810`. Recovery deliveries are
-encrypted in the local database so they survive separate PHP requests. A
-local/test-only mailbox endpoint,
-`GET /local/verification-mailbox/recovery?email=...`, returns the latest
-recovery path for browser acceptance. It returns 404 when the application is
-not local/testing or the deterministic adapter is disabled. `/forgot` never
+`IDENTITY_DETERMINISTIC_CODE`. Recovery deliveries are encrypted in the local
+database so they survive separate PHP requests. Browser acceptance obtains its
+own recovery path through `php artisan identity:local-recovery-path` using
+stdin. There is no HTTP mailbox endpoint: ordinary HTTP requests return 404,
+and recipient or bearer values never enter a query URL. `/forgot` never
 returns the token.
 
 No production email or OTP provider is enabled by this issue.

@@ -3,12 +3,15 @@
 namespace Tests\Feature\IdentityAccess;
 
 use App\Models\Account;
+use App\Modules\IdentityAccess\Infrastructure\PrivacySafeRateLimiter;
 use App\Modules\People\Contracts\PersonIdentityDirectory;
 use App\Modules\People\Data\IdentityClaim;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -142,6 +145,113 @@ final class AuthenticationJourneyTest extends TestCase
             )['reason'])
             ->all();
         $this->assertContains('rate_limited', $denialReasons);
+    }
+
+    public function test_client_bucket_cannot_be_bypassed_by_rotating_identifiers(): void
+    {
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.41']);
+
+        foreach (range(1, 20) as $attempt) {
+            $this->postJson('/signin', [
+                'identity_type' => 'passport',
+                'identity_number' => sprintf('ROTATE%06d', $attempt),
+                'password' => 'wrong-password-123',
+            ])->assertUnprocessable();
+        }
+
+        $this->postJson('/signin', [
+            'identity_type' => 'passport',
+            'identity_number' => 'ROTATE999999',
+            'password' => 'wrong-password-123',
+        ])->assertTooManyRequests();
+    }
+
+    public function test_identifier_bucket_cannot_be_bypassed_by_rotating_clients(): void
+    {
+        $this->createAccount('passport', 'TARGET12345', 'correct-password-123');
+
+        foreach (range(1, 5) as $attempt) {
+            $this->withServerVariables(['REMOTE_ADDR' => "198.51.100.{$attempt}"])
+                ->postJson('/signin', [
+                    'identity_type' => 'passport',
+                    'identity_number' => 'TARGET12345',
+                    'password' => 'wrong-password-123',
+                ])->assertUnprocessable();
+        }
+
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.99'])
+            ->postJson('/signin', [
+                'identity_type' => 'passport',
+                'identity_number' => 'TARGET12345',
+                'password' => 'wrong-password-123',
+            ])->assertTooManyRequests();
+    }
+
+    public function test_real_redis_parallel_requests_cannot_overrun_an_overlapping_client_bucket(): void
+    {
+        if (! function_exists('pcntl_fork') || ! function_exists('posix_kill')) {
+            self::markTestSkipped('pcntl is required for the real-Redis concurrency check.');
+        }
+
+        // phpunit defaults to array cache; deliberately switch this one test
+        // to the Compose Redis service so process isolation is real.
+        config()->set('cache.default', 'redis');
+        Cache::clearResolvedInstance('cache');
+        RateLimiter::clearResolvedInstance('cache.rateLimiter');
+        Cache::clear();
+        $resultFile = tempnam(sys_get_temp_dir(), 'tapoda-rate-');
+        self::assertNotFalse($resultFile);
+        $children = [];
+
+        foreach (range(1, 4) as $attempt) {
+            $pid = pcntl_fork();
+            self::assertNotSame(-1, $pid);
+
+            if ($pid === 0) {
+                // Forking inherits the parent's phpredis socket. Discard each
+                // resolved cache service so every child opens its own real
+                // Redis connection before contending on the distributed lock.
+                Cache::clearResolvedInstance('cache');
+                RateLimiter::clearResolvedInstance('cache.rateLimiter');
+                $this->app->forgetInstance('cache');
+                $this->app->forgetInstance('cache.rateLimiter');
+
+                $accepted = $this->app->make(PrivacySafeRateLimiter::class)->attemptIdentity(
+                    'parallel-client-ceiling',
+                    '198.51.100.200',
+                    IdentityClaim::fromInput('passport', sprintf('PARALLEL%04d', $attempt)),
+                    ['client' => 1, 'identifier' => 10, 'pair' => 10, 'decay' => 60],
+                    static function () use ($resultFile): bool {
+                        file_put_contents($resultFile, "1\n", FILE_APPEND | LOCK_EX);
+
+                        return true;
+                    },
+                );
+
+                // Do not run Laravel/PHPUnit shutdown handlers in the forked
+                // child; RefreshDatabase teardown would race the parent
+                // against the same PostgreSQL schema. The callback has
+                // already written/closed its result file.
+                posix_kill(posix_getpid(), SIGKILL);
+            }
+
+            $children[] = $pid;
+        }
+
+        foreach ($children as $pid) {
+            pcntl_waitpid($pid, $status);
+            self::assertTrue(pcntl_wifsignaled($status));
+        }
+
+        self::assertCount(1, file($resultFile, FILE_IGNORE_NEW_LINES));
+        @unlink($resultFile);
+        Cache::clear();
+        // Restore PHPUnit's default cache and clear test-local audit state;
+        // the forked child deliberately bypasses normal Laravel teardown.
+        config()->set('cache.default', 'array');
+        Cache::clearResolvedInstance('cache');
+        RateLimiter::clearResolvedInstance('cache.rateLimiter');
+        DB::table('audit_events')->truncate();
     }
 
     public function test_sign_in_validation_is_thai_and_does_not_query_malformed_identity(): void

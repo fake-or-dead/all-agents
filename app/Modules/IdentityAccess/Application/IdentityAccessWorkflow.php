@@ -340,6 +340,11 @@ final readonly class IdentityAccessWorkflow
 
                 return IdentityAccessResult::success('registered', [
                     'account_id' => $accountId,
+                    // This is the credential generation authorized by the
+                    // registration transaction. A later recovery must not be
+                    // able to turn a delayed framework login into a new live
+                    // session for its newer generation.
+                    'credential_epoch' => 1,
                 ]);
             }, 3);
         } catch (QueryException|RuntimeException) {
@@ -438,9 +443,12 @@ final readonly class IdentityAccessWorkflow
         });
     }
 
-    public function recordAuthenticatedSession(string $accountId, string $sessionId): void
-    {
-        $this->database->transaction(function () use ($accountId, $sessionId): void {
+    public function recordAuthenticatedSession(
+        string $accountId,
+        string $sessionId,
+        ?int $expectedCredentialEpoch = null,
+    ): void {
+        $this->database->transaction(function () use ($accountId, $sessionId, $expectedCredentialEpoch): void {
             $epoch = $this->database
                 ->table('accounts')
                 ->where('id', $accountId)
@@ -450,6 +458,10 @@ final readonly class IdentityAccessWorkflow
 
             if (! is_numeric($epoch)) {
                 throw new RuntimeException('Cannot record a session for an inactive account.');
+            }
+
+            if ($expectedCredentialEpoch !== null && (int) $epoch !== $expectedCredentialEpoch) {
+                throw new RuntimeException('Credential generation changed before session issuance.');
             }
 
             $this->writeAuthenticatedSession(

@@ -27,29 +27,36 @@ final readonly class IdentitySecurityConfiguration
             );
         }
 
-        $keys = [
-            'people lookup' => $this->currentKey(
+        $keySets = [
+            'people lookup' => $this->keys(
                 'people.identifier_lookup_key_version',
                 'people.identifier_lookup_keys',
             ),
-            'account lookup' => $this->currentKey(
+            'account lookup' => $this->keys(
                 'identity-access.account_lookup_key_version',
                 'identity-access.account_lookup_keys',
             ),
-            'rate limit' => $this->currentKey(
+            'rate limit' => $this->keys(
                 'identity-access.rate_limit_key_version',
                 'identity-access.rate_limit_keys',
             ),
         ];
         $appKey = (string) $this->config->get('app.key');
+        $allKeys = [];
 
-        foreach ($keys as $name => $key) {
-            if ($appKey !== '' && hash_equals($appKey, $key)) {
-                throw new RuntimeException("The {$name} key must not equal APP_KEY.");
+        foreach ($keySets as $name => $keys) {
+            foreach ($keys as $version => $key) {
+                if (! is_string($version) || $version === '' || ! is_string($key) || strlen($key) < 32) {
+                    throw new RuntimeException("Missing or unsafe versioned key: {$name}.");
+                }
+                if ($appKey !== '' && hash_equals($appKey, $key)) {
+                    throw new RuntimeException("The {$name} key must not equal APP_KEY.");
+                }
+                $allKeys["{$name}:{$version}"] = $key;
             }
         }
 
-        if (count(array_unique(array_values($keys))) !== count($keys)) {
+        if (count(array_unique(array_values($allKeys))) !== count($allKeys)) {
             throw new RuntimeException('Identity security keys must be distinct.');
         }
 
@@ -63,16 +70,22 @@ final readonly class IdentitySecurityConfiguration
         }
     }
 
-    private function currentKey(string $versionPath, string $keysPath): string
+    /** @return array<array-key, mixed> */
+    private function keys(string $versionPath, string $keysPath): array
     {
         $version = $this->config->get($versionPath);
         $keys = $this->config->get($keysPath);
-        $key = is_string($version) && is_array($keys) ? ($keys[$version] ?? null) : null;
 
-        if (! is_string($key) || strlen($key) < 32) {
+        if (! is_string($version) || ! is_array($keys)) {
             throw new RuntimeException("Missing or unsafe versioned key: {$keysPath}.");
         }
 
-        return $key;
+        $current = $keys[$version] ?? null;
+
+        if (! is_string($current) || strlen($current) < 32) {
+            throw new RuntimeException("Missing or unsafe versioned key: {$keysPath}.");
+        }
+
+        return $keys;
     }
 }

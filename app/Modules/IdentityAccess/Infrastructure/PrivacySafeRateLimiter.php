@@ -5,7 +5,9 @@ namespace App\Modules\IdentityAccess\Infrastructure;
 use App\Modules\People\Contracts\PersonIdentityDirectory;
 use App\Modules\People\Data\IdentityClaim;
 use Closure;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use RuntimeException;
 
@@ -83,19 +85,40 @@ final readonly class PrivacySafeRateLimiter
             [$this->key($action, 'pair', "{$client}:{$identifier}"), $limits['pair']],
         ];
 
-        foreach ($keys as [$key, $maximum]) {
-            if (RateLimiter::tooManyAttempts($key, $maximum)) {
-                return false;
-            }
+        // Redis Cache::lock is an atomic distributed mutex. All three bucket
+        // checks and increments therefore observe one linearized request,
+        // rather than three stale reads followed by three independent writes.
+        // This is deliberately action-scoped, not pair-scoped: concurrent
+        // requests with a different identifier still share the client bucket,
+        // and requests from a different client still share the identifier
+        // bucket. One Redis mutex gives every overlapping bucket set a single
+        // serialization point without putting any PII in a key.
+        $lock = Cache::lock(
+            'identity-access:rate-lock:'.$this->keyVersion().':'.$action,
+            max(2, $limits['decay']),
+        );
+
+        try {
+            return $lock->block(2, function () use ($keys, $limits, $callback): bool {
+                foreach ($keys as [$key, $maximum]) {
+                    if (RateLimiter::tooManyAttempts($key, $maximum)) {
+                        return false;
+                    }
+                }
+
+                foreach ($keys as [$key]) {
+                    RateLimiter::hit($key, $limits['decay']);
+                }
+
+                $callback();
+
+                return true;
+            });
+        } catch (LockTimeoutException) {
+            // A contended abuse-control request fails closed and keeps the
+            // public response neutral in its controller.
+            return false;
         }
-
-        foreach ($keys as [$key]) {
-            RateLimiter::hit($key, $limits['decay']);
-        }
-
-        $callback();
-
-        return true;
     }
 
     private function key(string $action, string $scope, string $subject): string

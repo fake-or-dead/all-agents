@@ -40,4 +40,34 @@ final class IdentitySecurityConfigurationTest extends TestCase
 
         $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
     }
+
+    public function test_previous_lookup_key_is_checked_for_strength_and_app_key_reuse(): void
+    {
+        config()->set('people.identifier_lookup_keys.v0', 'too-short');
+
+        try {
+            $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
+            self::fail('Unsafe previous key was accepted.');
+        } catch (RuntimeException $exception) {
+            self::assertStringContainsString('Missing or unsafe versioned key', $exception->getMessage());
+        }
+
+        config()->set('people.identifier_lookup_keys.v0', (string) config('app.key'));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('people lookup key must not equal APP_KEY');
+        $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
+    }
+
+    public function test_previous_key_must_not_be_reused_by_another_security_domain(): void
+    {
+        config()->set(
+            'identity-access.account_lookup_keys.v0',
+            (string) config('people.identifier_lookup_keys.v1'),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Identity security keys must be distinct');
+        $this->app->make(IdentitySecurityConfiguration::class)->assertSafe();
+    }
 }

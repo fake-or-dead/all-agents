@@ -13,9 +13,6 @@ type Props = {
 };
 
 export default function Register({ consent, csrfToken }: Props) {
-    const personLinkToken = new URLSearchParams(window.location.search).get(
-        "person_link_token",
-    );
     const [registrationToken, setRegistrationToken] = useState("");
     const [verifiedEmail, setVerifiedEmail] = useState("");
     const [proofExpiresAt, setProofExpiresAt] = useState("");
@@ -102,7 +99,6 @@ export default function Register({ consent, csrfToken }: Props) {
         const result = await submitJson("/signup", csrfToken, {
             ...data,
             registration_token: registrationToken,
-            person_link_token: personLinkToken,
             consent_accepted: data.consent_accepted === "yes",
             consent_version: consent.id,
         });
@@ -217,6 +213,21 @@ export default function Register({ consent, csrfToken }: Props) {
                             autoComplete="off"
                             required
                         />
+                    </div>
+                    <div className="field">
+                        <label htmlFor="person_link_token">
+                            รหัสเชื่อมบุคคลเดิม (ถ้ามี)
+                        </label>
+                        <input
+                            id="person_link_token"
+                            name="person_link_token"
+                            type="password"
+                            autoComplete="off"
+                            spellCheck={false}
+                        />
+                        <p className="field-help">
+                            วางรหัสที่ได้รับจากผู้ดูแลในช่องนี้เท่านั้น ห้ามส่งผ่านลิงก์
+                        </p>
                     </div>
                     <div className="field-grid">
                         <div className="field">

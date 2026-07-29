@@ -129,14 +129,21 @@ final class RegistrationController extends Controller
         }
 
         $account = Account::query()->findOrFail($result->data['account_id']);
+        $authSessionId = Str::random(64);
+        try {
+            $this->identityAccess->recordAuthenticatedSession(
+                (string) $account->getAuthIdentifier(),
+                $authSessionId,
+                (int) $result->data['credential_epoch'],
+            );
+        } catch (\RuntimeException) {
+            return response()->json([
+                'message' => 'ไม่สามารถสร้างบัญชีได้ กรุณาตรวจสอบข้อมูลหรือขอรหัสใหม่',
+            ], 422);
+        }
         Auth::login($account);
         $request->session()->regenerate();
-        $authSessionId = Str::random(64);
         $request->session()->put('identity_access.auth_session_id', $authSessionId);
-        $this->identityAccess->recordAuthenticatedSession(
-            (string) $account->getAuthIdentifier(),
-            $authSessionId,
-        );
 
         return $request->expectsJson()
             ? response()->json(['redirect' => route('account.home')], 201)

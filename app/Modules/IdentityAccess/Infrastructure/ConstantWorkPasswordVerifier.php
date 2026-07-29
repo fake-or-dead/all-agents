@@ -55,7 +55,18 @@ final readonly class ConstantWorkPasswordVerifier
             throw new RuntimeException('Supported bcrypt costs are not configured.');
         }
 
-        return array_values(array_map('intval', $costs));
+        $normalized = array_values(array_unique(array_map('intval', $costs)));
+        $configured = (int) $this->config->get('hashing.bcrypt.rounds', 12);
+
+        if (! in_array($configured, $normalized, true)) {
+            throw new RuntimeException("Unsupported configured bcrypt cost {$configured}.");
+        }
+
+        foreach ($normalized as $cost) {
+            $this->dummyHash($cost);
+        }
+
+        return $normalized;
     }
 
     private function dummyHash(int $cost): string

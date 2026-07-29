@@ -110,6 +110,38 @@ poll_endpoint() {
     done
 }
 
+assert_recovery_token_headers() {
+    headers_file="${temporary_directory}/recovery.headers"
+    response_file="${temporary_directory}/recovery.body"
+    error_file="${temporary_directory}/recovery.error"
+
+    if ! curl \
+        --silent \
+        --show-error \
+        --connect-timeout "${connect_timeout_seconds}" \
+        --max-time "${request_timeout_seconds}" \
+        --dump-header "${headers_file}" \
+        --output "${response_file}" \
+        "${base_url}/recover/caddy-smoke-non-secret" \
+        2> "${error_file}"; then
+        error_preview="$(tr '\n\r' '  ' < "${error_file}" | cut -c1-200)"
+        echo "Recovery-header smoke check failed: ${error_preview}" >&2
+        return 1
+    fi
+
+    if ! grep -Eiq '^Referrer-Policy: *no-referrer[[:space:]]*$' "${headers_file}"; then
+        echo "Recovery-header smoke check missing Referrer-Policy: no-referrer." >&2
+        return 1
+    fi
+
+    if ! grep -Eiq '^Cache-Control: .*no-store' "${headers_file}"; then
+        echo "Recovery-header smoke check missing Cache-Control: no-store." >&2
+        return 1
+    fi
+
+    echo "Smoke check passed: recovery-token headers"
+}
+
 poll_endpoint \
     liveness \
     /health/live \
@@ -125,6 +157,7 @@ poll_endpoint \
     / \
     'lang="th"' \
     "${temporary_directory}/home.html"
+assert_recovery_token_headers
 
 if grep -Eiq 'password|secret|dsn|DB_HOST' "${temporary_directory}/live.json" "${temporary_directory}/ready.json"; then
     echo "Health response contains a forbidden connection or secret field." >&2
