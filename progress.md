@@ -1,6 +1,6 @@
 # Delivery Progress
 
-Last updated: 2026-07-29 14:44 +07
+Last updated: 2026-07-29 14:57 +07
 
 Owner: PM/controller. This is the presentation-ready delivery dashboard. Update
 at each merge, blocker, replacement SHA, runtime change, and hourly checkpoint.
@@ -12,7 +12,7 @@ GitHub Issues remain the task-level source of truth.
   a verified Docker application at `http://localhost:8080`.
 - Explicit exclusions: production approvals, production writes, cutover, and
   destructive legacy retirement.
-- Scope tracker: 11 closed / 21 open.
+- Scope tracker: 12 closed / 20 open.
 - Default-branch release: PR #40 merged at
   `9749eaec91e154584366bc64261e9fb3d2c6d5e2`; reviewed head `daf9cd9`, CI
   4/4, dual reciprocal approval complete. It follows PR #39, which delivered
@@ -45,9 +45,11 @@ Issue #36 reserves this local-only candidate account:
 - Recovery email: `local-seed-account@tapoda.test`
 
 PR #42 exact head `478a5a734fb7ccec9a0e835dbcd1076b104091a3`
-passed a fresh isolated PostgreSQL seed, readiness/smoke, and real HTTP sign-in
-to `/account`. These credentials are not usable on `localhost:8080` until the
-PR passes CI, dual review, merge, and runtime rebuild.
+passed a fresh isolated PostgreSQL seed, readiness/smoke, real HTTP sign-in to
+`/account`, CI 4/4, and dual reciprocal review. It merged to integration at
+`a9389ac23de2e6eaaadefe3f4279b17a6c6c9f1e`; Issue #36 is closed. These
+credentials are not usable on `localhost:8080` until PR #43 merges to `main`
+and the runtime is rebuilt.
 Course Catalog is merged to integration but its URLs are not listed as live
 until the next `main` release and `localhost:8080` rebuild.
 
@@ -59,7 +61,7 @@ until the next `main` release and `localhost:8080` rebuild.
 | 2 | PM operating system | Delivered | PR #40 merge `9749eaec`, reviewed `daf9cd9`, CI 4/4, dual reciprocal PASS | Keep dashboard authoritative |
 | 3 | Course Catalog canonical ownership | Delivered to integration; Issue #10 closed | PR #34 merge `e675535`, reviewed `0eb7fe2`, CI `30431450234` 4/4, Browser 26/26, dual reciprocal PASS | Include in next `main` release and rebuild `:8080` |
 | 4 | Deterministic PHPStan memory gate | Delivered to integration | PR #38 merge `762ff4c`, reviewed `c62ae43`, CI 4/4, dual reciprocal PASS | Include in next `main` release |
-| 5 | Safe canonical local seed | PR open; CI running | PR #42 `478a5a7`; fresh isolated PostgreSQL seed and real HTTP sign-in pass | CI, dual review, merge |
+| 5 | Safe canonical local seed | Delivered to integration; Issue #36 closed | PR #42 merge `a9389ac`, reviewed `478a5a7`, CI 4/4, fresh seed/sign-in and dual reciprocal PASS | Include in PR #43 release and rebuild `:8080` |
 | 6 | Profile/application security | Not started | Issue #12 | Start after #34 schema lands |
 
 ## Active workstreams
@@ -69,9 +71,9 @@ until the next `main` release and `localhost:8080` rebuild.
 | Release control | PM/controller | PR #39 and PR #40 merged to `main`; exact release live on `:8080` | None | Release Course Catalog when green |
 | PM operating system | PM/controller | Delivered and active | None | Refresh dashboard at every phase boundary |
 | Course Catalog | coding + dual review agents complete | PR #34 merged at `e675535`; Issue #10 closed | Not yet released to `main`/`:8080` | Ship next small release |
-| Local seed | coding agent complete; reviewers next | PR #42 exact `478a5a7`; guarded credentials and fresh sign-in proof documented above | CI/review pending | Exact-SHA dual reciprocal review after CI |
+| Local seed | coding/review agents complete | PR #42 merged at `a9389ac`; Issue #36 closed | Not yet released to `main`/`:8080` | Ship through PR #43 and verify seeded sign-in on `:8080` |
 | PHPStan gate | coding/review agents complete | PR #38 merged at `762ff4c`; Issue #37 closed | None | Ship with next release |
-| Issue #12 member center | queued coding agent | Implementation task packet posted at Issue comment `5114102073` | Start condition satisfied by PR #34 merge | Branch from integration `e675535` after release branch isolation |
+| Issue #12 member center | coding agent active | Implementation task packet posted at Issue comment `5114102073`; isolated branch from integration `e675535` | Must not overlap PR #42 seed files | Produce focused local candidate and issue checkpoint |
 
 ## Delivery metrics
 
