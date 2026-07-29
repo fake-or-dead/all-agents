@@ -59,3 +59,12 @@ Every active delivery hour records:
 - Runtime problem found: adding a recovery-specific Caddy header block was insufficient because the global header block still executed and overwrote `no-referrer`. Recovery and non-recovery policies now use disjoint matchers, and `bin/smoke` verifies the final Docker response headers.
 - CI-parity problem found: local full PHP gates ran inside Compose with PostgreSQL and Redis, while the backend CI job ran a standalone SQLite/no-Redis test image. Two real-service proofs passed locally but failed CI before assertions. Ordinary tests must skip unavailable integration dependencies, and CI must contain a separate required PostgreSQL/Redis integration step that cannot silently skip.
 - Next-hour target: integrate both PR #35 commits, pass focused and full local gates, and produce one replacement SHA ready for dual exact-SHA review.
+
+### 2026-07-29 11:07 +07
+
+- Output: PR #35 replacement head `617997bc89df72cd5e580b4d7dd00d585554a8cd` is pushed. Exact runtime image `sha256:845d80aa4afc525c26821ed16bcf86323710728ceeb0dac0d80cbd8082aa6cd1` passed artifact assertions and smoke at `http://127.0.0.1:18114`. GitHub CI is 4/4 green. Dual exact-SHA security and acceptance review has started. Nothing new is merged or visible on `localhost:8080` yet.
+- Bottleneck: independent xhigh review and cross-review are now the only PR #35 merge gate.
+- Loop found: the first CI run exposed missing service topology; the replacement CI run then failed both Docker builds before tests because PECL returned HTTP 504 for `redis-6.3.0.tgz`. The same SHA passed on one bounded rerun, proving infrastructure failure rather than repository behavior.
+- Change applied: backend CI now separates portable SQLite tests from a required six-test PostgreSQL/Redis group that fails instead of skipping when services are absent. Upstream build outages receive one same-SHA rerun; repeated failure requires deterministic Docker build hardening instead of repeated retries.
+- Delivery result: previous next-hour target was met for candidate creation and CI, but not approval/merge. The visible-runtime objective remains incomplete.
+- Next-hour target: obtain dual approval and merge PR #35, rebase and finish PR #34 on the canonical account schema, then rebuild `localhost:8080` with both Auth and Catalog.
