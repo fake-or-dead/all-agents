@@ -82,4 +82,17 @@ final class LocalSeedTest extends TestCase
         ]);
         $this->assertDatabaseCount('consent_acceptances', 0);
     }
+
+    public function test_seeded_identity_can_sign_in_through_the_supported_public_flow(): void
+    {
+        $this->seed();
+
+        $this->postJson('/signin', [
+            'identity_type' => 'personal_id',
+            'identity_number' => '1234567890123',
+            'password' => 'TapodaLocalSeed!2026',
+        ])->assertOk()->assertJsonPath('redirect', '/account');
+
+        $this->assertAuthenticated();
+    }
 }
