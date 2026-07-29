@@ -1,0 +1,19 @@
+/* Generated. Do not edit. */
+@theme {
+    --color-action-destructive: var(--action-destructive);
+    --color-action-primary: var(--action-primary);
+    --color-action-secondary: var(--action-secondary);
+    --color-border-default: var(--border-default);
+    --color-border-strong: var(--border-strong);
+    --color-focus-ring: var(--focus-ring);
+    --color-status-blocked: var(--status-blocked);
+    --color-status-ready: var(--status-ready);
+    --color-status-waiting: var(--status-waiting);
+    --color-surface-default: var(--surface-default);
+    --color-surface-elevated: var(--surface-elevated);
+    --color-surface-page: var(--surface-page);
+    --color-text-default: var(--text-default);
+    --color-text-inverse: var(--text-inverse);
+    --color-text-link: var(--text-link);
+    --color-text-muted: var(--text-muted);
+}

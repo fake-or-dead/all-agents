@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/>
+        <env name="PEOPLE_IDENTIFIER_LOOKUP_KEY_VERSION" value="v1"/>
+        <env name="PEOPLE_IDENTIFIER_LOOKUP_KEY" value="people-test-key-11111111111111111111111111111111"/>
+        <env name="IDENTITY_ACCOUNT_LOOKUP_KEY_VERSION" value="v1"/>
+        <env name="IDENTITY_ACCOUNT_LOOKUP_KEY" value="account-test-key-222222222222222222222222222222"/>
+        <env name="IDENTITY_RATE_LIMIT_KEY_VERSION" value="v1"/>
+        <env name="IDENTITY_RATE_LIMIT_KEY" value="rate-test-key-333333333333333333333333333333333"/>
+        <env name="IDENTITY_VERIFICATION_ADAPTER" value="deterministic-fake"/>
+        <env name="IDENTITY_DETERMINISTIC_CODE" value="246810"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array"/>
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="DB_URL" value=""/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="PLATFORM_ACTOR_ADAPTER" value="test-header"/>
+        <env name="PLATFORM_COMPLETION_ADAPTER" value="deterministic-fake"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+    </php>
+</phpunit>

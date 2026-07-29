@@ -1,0 +1,9 @@
+{
+    "font": {
+        "body": { "value": "\"Sarabun\", system-ui, sans-serif" },
+        "size-body": { "value": "1rem" },
+        "size-small": { "value": "0.875rem" },
+        "size-title": { "value": "clamp(1.75rem, 5vw, 3rem)" },
+        "line-body": { "value": "1.65" }
+    }
+}

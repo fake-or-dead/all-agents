@@ -1,0 +1,46 @@
+{
+    "$schema": "https://www.schemastore.org/package.json",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "npm run tokens && vite build",
+        "dev": "vite",
+        "tokens": "node resources/design/build/build-tokens.mjs",
+        "tokens:check": "node resources/design/build/build-tokens.mjs --check",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint . && stylelint 'resources/**/*.css'",
+        "format:check": "node node_modules/prettier/bin/prettier.cjs --check 'resources/**/*.{css,js,json,ts,tsx}' 'tests/Browser/**/*.ts' 'tests/Smoke/**/*.mjs' 'tools/**/*.{js,mjs}' '*.{js,json,ts}'",
+        "bundle:check": "node tools/check-bundle.mjs",
+        "test:smoke": "node --test tests/Smoke/*.test.mjs",
+        "test:browser": "playwright test",
+        "test:browser:update": "playwright test --update-snapshots"
+    },
+    "dependencies": {
+        "@fontsource/sarabun": "^5.2.8",
+        "@inertiajs/react": "^3.0.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
+    },
+    "devDependencies": {
+        "@axe-core/playwright": "^4.10.2",
+        "@eslint/js": "^10.0.1",
+        "@playwright/test": "^1.58.0",
+        "@tailwindcss/vite": "^4.0.0",
+        "@types/node": "^24.10.1",
+        "@types/react": "^19.2.7",
+        "@types/react-dom": "^19.2.3",
+        "@vitejs/plugin-react": "^5.1.2",
+        "eslint": "^10.8.0",
+        "eslint-plugin-react-hooks": "^7.0.1",
+        "eslint-plugin-react-refresh": "^0.4.24",
+        "globals": "^16.5.0",
+        "laravel-vite-plugin": "^3.1",
+        "prettier": "^3.7.4",
+        "stylelint": "^16.26.1",
+        "stylelint-config-standard": "^39.0.1",
+        "tailwindcss": "^4.0.0",
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.50.0",
+        "vite": "^8.0.0"
+    }
+}

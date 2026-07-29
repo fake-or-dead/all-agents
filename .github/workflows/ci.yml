@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - integration/local-complete
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build locked PHP 8.5 test image
+        run: docker build --target test --tag tapoda-next:test .
+      - name: Backend, architecture, and security checks
+        run: |
+          docker run --rm tapoda-next:test composer validate --strict --no-check-publish
+          docker run --rm tapoda-next:test composer audit --locked
+          docker run --rm tapoda-next:test vendor/bin/pint --test app routes tests database config bootstrap/app.php bootstrap/providers.php
+          docker run --rm tapoda-next:test php tools/architecture-check.php
+          docker run --rm tapoda-next:test vendor/bin/phpstan analyse --memory-limit=512M
+          docker run --rm tapoda-next:test php vendor/bin/phpunit
+      - name: PostgreSQL and Redis service-integration proofs
+        env:
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          POSTGRES_PASSWORD: issue09-ci-database-password
+          PEOPLE_IDENTIFIER_LOOKUP_KEY_VERSION: v1
+          PEOPLE_IDENTIFIER_LOOKUP_KEY: people-ci-key-111111111111111111111111111111111
+          IDENTITY_ACCOUNT_LOOKUP_KEY_VERSION: v1
+          IDENTITY_ACCOUNT_LOOKUP_KEY: account-ci-key-22222222222222222222222222222222
+          IDENTITY_RATE_LIMIT_KEY_VERSION: v1
+          IDENTITY_RATE_LIMIT_KEY: rate-ci-key-33333333333333333333333333333333333
+          IDENTITY_VERIFICATION_ADAPTER: deterministic-fake
+          IDENTITY_DETERMINISTIC_CODE: "246810"
+          TAPODA_APP_IMAGE: tapoda-next:test
+        run: |
+          docker compose up -d --wait --wait-timeout 60 postgres redis
+          docker compose --profile tools run --rm -e REQUIRE_REAL_SERVICES=1 test \
+            php vendor/bin/phpunit --group service-integration
+      - if: failure()
+        run: docker compose logs --no-color postgres redis
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run tokens:check
+      - run: npm run build
+      - run: npm run bundle:check
+
+  browser:
+    runs-on: ubuntu-latest
+    env:
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      POSTGRES_PASSWORD: issue09-ci-database-password
+      PEOPLE_IDENTIFIER_LOOKUP_KEY_VERSION: v1
+      PEOPLE_IDENTIFIER_LOOKUP_KEY: people-ci-key-111111111111111111111111111111111
+      IDENTITY_ACCOUNT_LOOKUP_KEY_VERSION: v1
+      IDENTITY_ACCOUNT_LOOKUP_KEY: account-ci-key-22222222222222222222222222222222
+      IDENTITY_RATE_LIMIT_KEY_VERSION: v1
+      IDENTITY_RATE_LIMIT_KEY: rate-ci-key-33333333333333333333333333333333333
+      IDENTITY_VERIFICATION_ADAPTER: deterministic-fake
+      IDENTITY_DETERMINISTIC_CODE: "246810"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run test:smoke
+      - run: npx playwright install --with-deps chromium
+      - name: Build exact browser runtime artifact
+        run: |
+          bin/build-artifact ci "${GITHUB_SHA}"
+          echo "TAPODA_APP_IMAGE=$(docker image inspect --format '{{.Id}}' tapoda-next:ci)" >> "${GITHUB_ENV}"
+      - run: docker compose up -d --wait --wait-timeout 60 postgres redis
+      - run: docker compose --profile tools up --no-deps --abort-on-container-exit --exit-code-from migrate migrate
+      - run: docker compose up -d web worker scheduler
+      - run: bin/assert-runtime-artifact ci "${GITHUB_SHA}" migrate web worker scheduler
+      - name: Wait for bounded application readiness
+        run: bin/smoke http://127.0.0.1:8080
+        env:
+          SMOKE_OVERALL_TIMEOUT_SECONDS: 60
+          SMOKE_CONNECT_TIMEOUT_SECONDS: 2
+          SMOKE_REQUEST_TIMEOUT_SECONDS: 5
+          SMOKE_RETRY_INTERVAL_SECONDS: 1
+      - run: npm run test:browser
+      - if: failure()
+        run: docker compose logs --no-color
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

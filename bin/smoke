@@ -1,0 +1,167 @@
+#!/bin/sh
+set -eu
+
+base_url="${1:-http://127.0.0.1:8080}"
+base_url="${base_url%/}"
+overall_timeout_seconds="${SMOKE_OVERALL_TIMEOUT_SECONDS:-60}"
+connect_timeout_seconds="${SMOKE_CONNECT_TIMEOUT_SECONDS:-2}"
+request_timeout_seconds="${SMOKE_REQUEST_TIMEOUT_SECONDS:-5}"
+retry_interval_seconds="${SMOKE_RETRY_INTERVAL_SECONDS:-1}"
+temporary_directory="$(mktemp -d)"
+trap 'rm -rf "${temporary_directory}"' EXIT
+
+require_positive_integer() {
+    variable_name="$1"
+    variable_value="$2"
+
+    case "${variable_value}" in
+        '' | *[!0-9]* | 0)
+            echo "${variable_name} must be a positive integer; received '${variable_value}'." >&2
+            exit 2
+            ;;
+    esac
+}
+
+require_positive_integer SMOKE_OVERALL_TIMEOUT_SECONDS "${overall_timeout_seconds}"
+require_positive_integer SMOKE_CONNECT_TIMEOUT_SECONDS "${connect_timeout_seconds}"
+require_positive_integer SMOKE_REQUEST_TIMEOUT_SECONDS "${request_timeout_seconds}"
+require_positive_integer SMOKE_RETRY_INTERVAL_SECONDS "${retry_interval_seconds}"
+
+started_at="$(date +%s)"
+deadline=$((started_at + overall_timeout_seconds))
+
+poll_endpoint() {
+    label="$1"
+    path="$2"
+    expected_marker="$3"
+    response_file="$4"
+    error_file="${temporary_directory}/${label}.error"
+    attempts=0
+    last_observation="request not attempted"
+
+    while :; do
+        now="$(date +%s)"
+        remaining=$((deadline - now))
+
+        if [ "${remaining}" -le 0 ]; then
+            echo "Smoke check timed out after ${overall_timeout_seconds}s: ${label} ${base_url}${path}; attempts=${attempts}; last=${last_observation}" >&2
+            return 1
+        fi
+
+        attempt_request_timeout="${request_timeout_seconds}"
+        if [ "${attempt_request_timeout}" -gt "${remaining}" ]; then
+            attempt_request_timeout="${remaining}"
+        fi
+
+        attempt_connect_timeout="${connect_timeout_seconds}"
+        if [ "${attempt_connect_timeout}" -gt "${attempt_request_timeout}" ]; then
+            attempt_connect_timeout="${attempt_request_timeout}"
+        fi
+
+        attempts=$((attempts + 1))
+        : > "${response_file}"
+        : > "${error_file}"
+
+        if status_code="$(
+            curl \
+                --silent \
+                --show-error \
+                --connect-timeout "${attempt_connect_timeout}" \
+                --max-time "${attempt_request_timeout}" \
+                --output "${response_file}" \
+                --write-out '%{http_code}' \
+                "${base_url}${path}" \
+                2> "${error_file}"
+        )"; then
+            case "${status_code}" in
+                2??)
+                    if grep -Fq "${expected_marker}" "${response_file}"; then
+                        echo "Smoke check passed: ${label} (${attempts} attempt(s))"
+                        return 0
+                    fi
+
+                    body_bytes="$(wc -c < "${response_file}" | tr -d '[:space:]')"
+                    last_observation="HTTP ${status_code}, missing marker '${expected_marker}', response_bytes=${body_bytes}"
+                    ;;
+                *)
+                    body_bytes="$(wc -c < "${response_file}" | tr -d '[:space:]')"
+                    last_observation="HTTP ${status_code}, expected marker '${expected_marker}', response_bytes=${body_bytes}"
+                    ;;
+            esac
+        else
+            curl_exit_code="$?"
+            error_preview="$(tr '\n\r' '  ' < "${error_file}" | cut -c1-200)"
+            last_observation="curl exit ${curl_exit_code}, error='${error_preview}'"
+        fi
+
+        now="$(date +%s)"
+        remaining=$((deadline - now))
+        if [ "${remaining}" -le 0 ]; then
+            continue
+        fi
+
+        sleep_seconds="${retry_interval_seconds}"
+        if [ "${sleep_seconds}" -gt "${remaining}" ]; then
+            sleep_seconds="${remaining}"
+        fi
+
+        echo "Smoke check pending: ${label}; attempt=${attempts}; last=${last_observation}; retrying in ${sleep_seconds}s" >&2
+        sleep "${sleep_seconds}"
+    done
+}
+
+assert_recovery_token_headers() {
+    headers_file="${temporary_directory}/recovery.headers"
+    response_file="${temporary_directory}/recovery.body"
+    error_file="${temporary_directory}/recovery.error"
+
+    if ! curl \
+        --silent \
+        --show-error \
+        --connect-timeout "${connect_timeout_seconds}" \
+        --max-time "${request_timeout_seconds}" \
+        --dump-header "${headers_file}" \
+        --output "${response_file}" \
+        "${base_url}/recover/caddy-smoke-non-secret" \
+        2> "${error_file}"; then
+        error_preview="$(tr '\n\r' '  ' < "${error_file}" | cut -c1-200)"
+        echo "Recovery-header smoke check failed: ${error_preview}" >&2
+        return 1
+    fi
+
+    if ! grep -Eiq '^Referrer-Policy: *no-referrer[[:space:]]*$' "${headers_file}"; then
+        echo "Recovery-header smoke check missing Referrer-Policy: no-referrer." >&2
+        return 1
+    fi
+
+    if ! grep -Eiq '^Cache-Control: .*no-store' "${headers_file}"; then
+        echo "Recovery-header smoke check missing Cache-Control: no-store." >&2
+        return 1
+    fi
+
+    echo "Smoke check passed: recovery-token headers"
+}
+
+poll_endpoint \
+    liveness \
+    /health/live \
+    '"status":"ok"' \
+    "${temporary_directory}/live.json"
+poll_endpoint \
+    readiness \
+    /health/ready \
+    '"status":"ready"' \
+    "${temporary_directory}/ready.json"
+poll_endpoint \
+    thai-home \
+    / \
+    'lang="th"' \
+    "${temporary_directory}/home.html"
+assert_recovery_token_headers
+
+if grep -Eiq 'password|secret|dsn|DB_HOST' "${temporary_directory}/live.json" "${temporary_directory}/ready.json"; then
+    echo "Health response contains a forbidden connection or secret field." >&2
+    exit 1
+fi
+
+echo "Smoke checks passed: ${base_url}"

@@ -1,0 +1,30 @@
+{
+    "surface": {
+        "page": { "value": "#f7f4f1" },
+        "default": { "value": "#ffffff" },
+        "elevated": { "value": "#ffffff" }
+    },
+    "text": {
+        "default": { "value": "#251f1b" },
+        "muted": { "value": "#594235" },
+        "inverse": { "value": "#ffffff" },
+        "link": { "value": "#285c8c" }
+    },
+    "border": {
+        "default": { "value": "#d8ccc3" },
+        "strong": { "value": "#765b49" }
+    },
+    "focus": {
+        "ring": { "value": "#285c8c" }
+    },
+    "action": {
+        "primary": { "value": "#176b49" },
+        "secondary": { "value": "#594235" },
+        "destructive": { "value": "#a32929" }
+    },
+    "status": {
+        "ready": { "value": "#176b49" },
+        "waiting": { "value": "#8a5700" },
+        "blocked": { "value": "#a32929" }
+    }
+}
