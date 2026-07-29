@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\ProtectRecoveryTokenResponse;
+use App\Http\Middleware\RequireActiveAccountSession;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -11,10 +13,14 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->redirectGuestsTo(
+            static fn (): string => route('auth.sign-in', absolute: false),
+        );
+        $middleware->appendToGroup('web', ProtectRecoveryTokenResponse::class);
+        $middleware->appendToGroup('web', RequireActiveAccountSession::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->expectsJson() || $request->is('api/*'),
         );
     })->create();

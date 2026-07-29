@@ -20,6 +20,14 @@
     <php>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/>
+        <env name="PEOPLE_IDENTIFIER_LOOKUP_KEY_VERSION" value="v1"/>
+        <env name="PEOPLE_IDENTIFIER_LOOKUP_KEY" value="people-test-key-11111111111111111111111111111111"/>
+        <env name="IDENTITY_ACCOUNT_LOOKUP_KEY_VERSION" value="v1"/>
+        <env name="IDENTITY_ACCOUNT_LOOKUP_KEY" value="account-test-key-222222222222222222222222222222"/>
+        <env name="IDENTITY_RATE_LIMIT_KEY_VERSION" value="v1"/>
+        <env name="IDENTITY_RATE_LIMIT_KEY" value="rate-test-key-333333333333333333333333333333333"/>
+        <env name="IDENTITY_VERIFICATION_ADAPTER" value="deterministic-fake"/>
+        <env name="IDENTITY_DETERMINISTIC_CODE" value="246810"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

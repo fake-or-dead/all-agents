@@ -241,3 +241,138 @@ code {
         transition-duration: 0.01ms !important;
     }
 }
+
+.auth-shell {
+    width: min(100% - (2 * var(--space-4)), 42rem);
+    margin-inline: auto;
+    padding-block: var(--space-8) var(--space-12);
+}
+
+.auth-card {
+    padding: clamp(var(--space-4), 5vw, var(--space-8));
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-medium);
+    background: var(--surface-elevated);
+}
+
+.auth-form,
+.auth-form fieldset {
+    display: grid;
+    gap: var(--space-4);
+}
+
+.auth-form {
+    margin-top: var(--space-6);
+}
+
+.auth-form fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: var(--space-4);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-small);
+}
+
+.auth-form legend,
+.field label {
+    font-weight: 600;
+}
+
+.field {
+    display: grid;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.field-grid,
+.verification-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+    align-items: end;
+}
+
+.verification-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+input,
+select {
+    width: 100%;
+    min-height: var(--size-touch);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-small);
+    color: var(--text-default);
+    background: var(--surface-default);
+    font: inherit;
+}
+
+input:focus-visible,
+select:focus-visible {
+    outline: 0.1875rem solid var(--focus-ring);
+    outline-offset: 0.125rem;
+}
+
+.check-field {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+}
+
+.check-field input {
+    width: var(--size-touch);
+    flex: 0 0 var(--size-touch);
+}
+
+.button-secondary {
+    color: var(--action-primary);
+    border: 1px solid var(--action-primary);
+    background: var(--surface-default);
+}
+
+.button-secondary:hover {
+    color: var(--action-secondary);
+    background: var(--surface-default);
+}
+
+.button-danger {
+    margin-top: var(--space-6);
+    background: var(--status-blocked);
+}
+
+.form-status,
+.form-error,
+.auth-links {
+    margin: var(--space-4) 0 0;
+}
+
+.form-error {
+    padding: var(--space-3);
+    border-left: 0.25rem solid var(--status-blocked);
+    background: var(--surface-page);
+}
+
+.consent-document {
+    margin-top: var(--space-6);
+    padding: var(--space-4);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-small);
+    background: var(--surface-page);
+}
+
+.consent-document p {
+    white-space: pre-wrap;
+}
+
+.auth-links a,
+.site-header a {
+    color: var(--text-link);
+}
+
+@media (width <= 36rem) {
+    .field-grid,
+    .verification-row {
+        grid-template-columns: 1fr;
+    }
+}

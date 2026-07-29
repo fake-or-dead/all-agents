@@ -23,7 +23,7 @@ SMOKE_RETRY_INTERVAL_SECONDS=1 \
 bin/smoke http://127.0.0.1:8080
 ```
 
-The smoke gate polls liveness, readiness, and the Thai home page under one 60-second deadline. Every request has a two-second connection timeout and five-second response timeout. Failure reports the endpoint, attempts, HTTP/curl result, and response size without printing response content. Open <http://127.0.0.1:8080>. Stop with `docker compose stop`.
+The smoke gate polls liveness, readiness, the Thai home page, and verifies that a non-secret recovery-token path returns `Referrer-Policy: no-referrer` plus `Cache-Control: no-store`. Every request has a two-second connection timeout and five-second response timeout. Failure reports the endpoint, attempts, HTTP/curl result, and response size without printing response content. Open <http://127.0.0.1:8080>. Stop with `docker compose stop`.
 
 ## Checks
 
